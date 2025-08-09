@@ -1,5 +1,5 @@
 import os, mimetypes, subprocess
-from fastapi import FastAPI, Request, Response, HTTPException, Form, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, Form, BackgroundTasks
 from fastapi.responses import (
     HTMLResponse,
     FileResponse,
@@ -209,41 +209,6 @@ def _list_zip_images(zip_path: str):
     with ZipFile(zip_path, 'r') as z:
         names = [n for n in z.namelist() if not n.endswith('/') and n.lower().endswith((".jpg",".jpeg",".png",".webp",".gif",".bmp",".tif",".tiff"))]
     return names
-
-@app.get("/zip/{media_id}/list")
-def zip_list(media_id: int):
-    with get_session() as s:
-        m = s.get(Media, media_id)
-        if not m or m.type != "zip": raise HTTPException(404)
-    return {"images": _list_zip_images(m.path)}
-
-@app.get("/zip/{media_id}/file/{index}")
-def zip_image(media_id: int, index: int):
-    with get_session() as s:
-        m = s.get(Media, media_id)
-        if not m or m.type != "zip": raise HTTPException(404)
-    names = _list_zip_images(m.path)
-    if index < 0 or index >= len(names): raise HTTPException(404)
-    with ZipFile(m.path, 'r') as z:
-        data = z.read(names[index])
-    mime = mimetypes.guess_type(names[index])[0] or "image/jpeg"
-    return Response(content=data, media_type=mime)
-
-@app.get("/zip/{media_id}/thumb/{index}")
-def zip_thumb(media_id: int, index: int):
-    with get_session() as s:
-        m = s.get(Media, media_id)
-        if not m or m.type != "zip": raise HTTPException(404)
-    names = _list_zip_images(m.path)
-    if index < 0 or index >= len(names): raise HTTPException(404)
-    key = f"{m.rel_path.replace(os.sep,'__')}__zip__{index}"
-    out = os.path.join(THUMB_DIR, key + ".jpg")
-    if not os.path.exists(out):
-        with ZipFile(m.path, 'r') as z:
-            data = z.read(names[index])
-        created = thumb_from_bytes(data, key)
-        if not created: raise HTTPException(500, "Failed to make thumbnail")
-    return FileResponse(out)
 
 # ----- Transcode/remux -----
 @app.post("/transcode/{media_id}")
