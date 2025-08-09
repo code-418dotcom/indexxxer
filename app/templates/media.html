@@ -6,9 +6,7 @@
   <p><a class="btn" href="/media/{{ item.id }}/thumbs">Change thumbnail</a></p>
   <div class="media-wrap">
     <div class="video-wrap">
-      <video controls preload="metadata" playsinline>
-        <source src="/stream/{{ item.id }}" type="video/{{ item.ext[1:] }}">
-      </video>
+      <video id="player" src="/stream/{{ item.id }}" controls preload="metadata" playsinline></video>
     </div>
   </div>
   <form method="post" action="/transcode/{{ item.id }}" style="margin-top:10px">

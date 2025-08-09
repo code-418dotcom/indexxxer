@@ -1,4 +1,4 @@
-import os, subprocess, io
+import os, subprocess, io, shutil
 from pathlib import Path
 from typing import Optional
 from PIL import Image
@@ -98,6 +98,24 @@ def cached_mp4_path_for(media) -> str:
 def cached_mp4_exists(media) -> bool:
     p = cached_mp4_path_for(media)
     return os.path.exists(p) and os.path.getsize(p) > 1000
+
+def has_nvidia_gpu() -> bool:
+    return shutil.which("nvidia-smi") is not None or any(os.path.exists(p) for p in ("/dev/nvidia0", "/dev/nvidiactl"))
+
+def is_streamable_video(path: str) -> bool:
+    info = ffprobe_json(path)
+    if not info:
+        return False
+    fmt = (info.get("format") or {}).get("format_name", "").lower()
+    v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), None)
+    a = next((s for s in info.get("streams", []) if s.get("codec_type") == "audio"), None)
+    if not v or not a:
+        return False
+    if "mp4" in fmt:
+        return v.get("codec_name") == "h264" and a.get("codec_name") == "aac"
+    if "webm" in fmt:
+        return v.get("codec_name") in {"vp8", "vp9", "av1"} and a.get("codec_name") in {"vorbis", "opus"}
+    return False
 
 # --- HLS helpers (added) ---
 import json, shutil, subprocess

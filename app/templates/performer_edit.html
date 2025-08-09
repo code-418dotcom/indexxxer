@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ p.name }}{% endblock %}
+{% block content %}
+<h2>Edit {{ p.name }}</h2>
+<img src="/performers/img/{{ p.id }}" alt="{{ p.name }}" style="width:160px;height:160px;object-fit:cover;border-radius:12px;margin-bottom:12px">
+<form action="/performer/{{ p.id }}/edit" method="post" enctype="multipart/form-data" class="grid" style="max-width:400px;gap:12px">
+  <label>Name<input type="text" name="name" value="{{ p.name }}" required></label>
+  <label>Aliases<input type="text" name="aliases" value="{{ p.aliases }}"></label>
+  <label>Date of birth<input type="text" name="dob" value="{{ p.dob }}"></label>
+  <label>Age<input type="number" name="age" value="{{ p.age or '' }}"></label>
+  <label>Career status<input type="text" name="career_status" value="{{ p.career_status }}"></label>
+  <label>Career start<input type="text" name="career_start" value="{{ p.career_start }}"></label>
+  <label>Career end<input type="text" name="career_end" value="{{ p.career_end }}"></label>
+  <label>Date of death<input type="text" name="dod" value="{{ p.dod }}"></label>
+  <label>Place of birth<input type="text" name="pob" value="{{ p.pob }}"></label>
+  <label>Ethnicity<input type="text" name="ethnicity" value="{{ p.ethnicity }}"></label>
+  <label>Boobs<input type="text" name="boobs" value="{{ p.boobs }}"></label>
+  <label>Bust<input type="text" name="bust" value="{{ p.bust }}"></label>
+  <label>Cup<input type="text" name="cup" value="{{ p.cup }}"></label>
+  <label>Bra<input type="text" name="bra" value="{{ p.bra }}"></label>
+  <label>Waist<input type="text" name="waist" value="{{ p.waist }}"></label>
+  <label>Hip<input type="text" name="hip" value="{{ p.hip }}"></label>
+  <label>Butt<input type="text" name="butt" value="{{ p.butt }}"></label>
+  <label>Height<input type="text" name="height" value="{{ p.height }}"></label>
+  <label>Weight<input type="text" name="weight" value="{{ p.weight }}"></label>
+  <label>Hair Color<input type="text" name="hair_color" value="{{ p.hair_color }}"></label>
+  <label>Eye Color<input type="text" name="eye_color" value="{{ p.eye_color }}"></label>
+  <label>Piercings<input type="text" name="piercings" value="{{ p.piercings }}"></label>
+  <label>Piercing locations<input type="text" name="piercing_locations" value="{{ p.piercing_locations }}"></label>
+  <label>Tattoos<input type="text" name="tattoos" value="{{ p.tattoos }}"></label>
+  <label>Tattoo locations<input type="text" name="tattoo_locations" value="{{ p.tattoo_locations }}"></label>
+  <label>Profile picture<input type="file" name="image" accept="image/*"></label>
+  <button type="submit" class="btn" style="grid-column:1/-1">Save</button>
+</form>
+{% endblock %}
+

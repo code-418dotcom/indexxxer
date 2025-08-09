@@ -8,8 +8,13 @@
   <button>Upload & Import</button>
 </form>
 {% if result %}
-  <p>Added: {{ result.added }}, Updated: {{ result.updated }}</p>
+  {% if result.error %}
+    <p style="color:#f66">{{ result.error }}</p>
+  {% else %}
+    <p>Added: {{ result.added }}, Updated: {{ result.updated }}</p>
+  {% endif %}
 {% endif %}
-<p style="opacity:.7">The importer is tolerant to columns; it looks for: <code>name</code>, <code>aliases</code>, <code>url</code>, <code>image_url</code>, <code>bio_url</code>, <code>profile_summary</code>.</p>
+<p style="opacity:.7">CSV must contain these headers in order:</p>
+<pre style="opacity:.7;white-space:pre-wrap">Name,Aliases,Date of birth,Age,Career status,Career start,Career end,Date of death,Place of birth,Ethnicity,Boobs,Bust,Cup,Bra,Waist,Hip,Butt,Height,Weight,Hair Color,Eye Color,Piercings,Piercing locations,Tattoos,Tattoo locations</pre>
 <a href="/performers" class="btn">View performers</a>
 {% endblock %}
