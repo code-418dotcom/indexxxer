@@ -178,8 +178,31 @@ def media_detail(request: Request, media_id: int):
                 i = ids.index(m.id)
                 if i>0: prev_id = ids[i-1]
                 if i<len(ids)-1: next_id = ids[i+1]
-
-    return templates.TemplateResponse("media.html", {"request": request, "item": m, "actress": actress, "prev_id": prev_id, "next_id": next_id})
+    play_hls = False
+    hls_src = None
+    if m.type == "video":
+        try:
+            play_hls = not is_directplay_mp4(m.path)
+        except Exception:
+            play_hls = True
+        if play_hls:
+            try:
+                ensure_hls(m.id, m.path)
+                hls_src = f"/transcoded/{m.id}/hls/master.m3u8"
+            except Exception:
+                play_hls = False
+    return templates.TemplateResponse(
+        "media.html",
+        {
+            "request": request,
+            "item": m,
+            "actress": actress,
+            "prev_id": prev_id,
+            "next_id": next_id,
+            "play_hls": play_hls,
+            "hls_src": hls_src,
+        },
+    )
 
 # ----- ZIP routes -----
 def _list_zip_images(zip_path: str):
@@ -422,6 +445,59 @@ def performer_detail(request: Request, pid: int):
         "request": request, "p": p, "media": media
     })
 
+@app.get("/performer/{pid}/edit", response_class=HTMLResponse)
+def performer_edit(request: Request, pid: int):
+    with get_session() as s:
+        p = s.get(Performer, pid)
+        if not p:
+            raise HTTPException(404)
+    return templates.TemplateResponse("performer_edit.html", {"request": request, "p": p})
+
+@app.post("/performer/{pid}/edit")
+async def performer_edit_post(request: Request, pid: int):
+    form = await request.form()
+    with get_session() as s:
+        p = s.get(Performer, pid)
+        if not p:
+            raise HTTPException(404)
+        p.name = form.get("name", p.name)
+        p.aliases = form.get("aliases", "")
+        p.dob = form.get("dob", "")
+        age = form.get("age")
+        p.age = int(age) if age and str(age).isdigit() else None
+        p.career_status = form.get("career_status", "")
+        p.career_start = form.get("career_start", "")
+        p.career_end = form.get("career_end", "")
+        p.dod = form.get("dod", "")
+        p.pob = form.get("pob", "")
+        p.ethnicity = form.get("ethnicity", "")
+        p.boobs = form.get("boobs", "")
+        p.bust = form.get("bust", "")
+        p.cup = form.get("cup", "")
+        p.bra = form.get("bra", "")
+        p.waist = form.get("waist", "")
+        p.hip = form.get("hip", "")
+        p.butt = form.get("butt", "")
+        p.height = form.get("height", "")
+        p.weight = form.get("weight", "")
+        p.hair_color = form.get("hair_color", "")
+        p.eye_color = form.get("eye_color", "")
+        p.piercings = form.get("piercings", "")
+        p.piercing_locations = form.get("piercing_locations", "")
+        p.tattoos = form.get("tattoos", "")
+        p.tattoo_locations = form.get("tattoo_locations", "")
+        s.add(p)
+        s.commit()
+    image = form.get("image")
+    if hasattr(image, "filename") and image.filename:
+        data = await image.read()
+        try:
+            with open(perf_image_path(pid), "wb") as f:
+                f.write(data)
+        except Exception:
+            pass
+    return RedirectResponse(f"/performer/{pid}", status_code=303)
+
 # ----------------------------------------------------------------------------
 # Performer import page + handler
 # ----------------------------------------------------------------------------
@@ -434,64 +510,72 @@ def maint_perf_page(request: Request):
 
 @app.post("/maintenance/performers/import", response_class=HTMLResponse)
 async def maint_perf_import(request: Request, file: UploadFile = FastFile(...)):
-    # read bytes and parse CSV leniently
+    # read bytes and parse CSV strictly by headers
     raw = await file.read()
     text = raw.decode("utf-8", errors="ignore")
     import csv, io
-    reader = csv.DictReader(io.StringIO(text))
+    reader = csv.reader(io.StringIO(text))
+    rows = list(reader)
+    expected = [
+        "Name","Aliases","Date of birth","Age","Career status","Career start",
+        "Career end","Date of death","Place of birth","Ethnicity","Boobs","Bust",
+        "Cup","Bra","Waist","Hip","Butt","Height","Weight","Hair Color",
+        "Eye Color","Piercings","Piercing locations","Tattoos","Tattoo locations"
+    ]
+    if not rows or rows[0] != expected:
+        return templates.TemplateResponse(
+            "perf_import.html",
+            {"request": request, "result": {"error": "Invalid headers"}},
+        )
     added = updated = 0
     with get_session() as s:
-        for row in reader:
-            if not row: 
+        for row in rows[1:]:
+            if not row or not row[0].strip():
                 continue
-            # flexible keys
-            def get(*keys):
-                for k in keys:
-                    if k in row and row[k]:
-                        return row[k]
-                # case-insensitive match
-                for k in row:
-                    if k.lower() in [kk.lower() for kk in keys] and row[k]:
-                        return row[k]
-                return ""
-            name = (get("name","Name") or "").strip()
-            if not name:
-                continue
-            aliases = get("Aliases","aliases")
-            site_url = get("url","site_url","Official website")
-            image_url = get("image_url","Image URL","image")
-            bio_url = get("bio_url","Bio URL")
-            profile_summary = get("profile_summary","Profile Summary")
-            # upsert by name
+            data = dict(zip(expected, row))
+            name = data["Name"].strip()
+            aliases = data.get("Aliases", "")
             obj = s.query(Performer).filter(Performer.name == name).first()
+            fields = {
+                "aliases": aliases,
+                "dob": data.get("Date of birth", ""),
+                "age": int(data.get("Age")) if data.get("Age") and data.get("Age").isdigit() else None,
+                "career_status": data.get("Career status", ""),
+                "career_start": data.get("Career start", ""),
+                "career_end": data.get("Career end", ""),
+                "dod": data.get("Date of death", ""),
+                "pob": data.get("Place of birth", ""),
+                "ethnicity": data.get("Ethnicity", ""),
+                "boobs": data.get("Boobs", ""),
+                "bust": data.get("Bust", ""),
+                "cup": data.get("Cup", ""),
+                "bra": data.get("Bra", ""),
+                "waist": data.get("Waist", ""),
+                "hip": data.get("Hip", ""),
+                "butt": data.get("Butt", ""),
+                "height": data.get("Height", ""),
+                "weight": data.get("Weight", ""),
+                "hair_color": data.get("Hair Color", ""),
+                "eye_color": data.get("Eye Color", ""),
+                "piercings": data.get("Piercings", ""),
+                "piercing_locations": data.get("Piercing locations", ""),
+                "tattoos": data.get("Tattoos", ""),
+                "tattoo_locations": data.get("Tattoo locations", ""),
+            }
             if obj:
-                obj.aliases = aliases or obj.aliases
-                obj.site_url = site_url or obj.site_url
-                obj.image_url = image_url or obj.image_url
-                obj.bio_url = bio_url or obj.bio_url
-                obj.profile_summary = profile_summary or obj.profile_summary
+                for k,v in fields.items():
+                    setattr(obj, k, v or getattr(obj, k))
                 updated += 1
             else:
-                obj = Performer(name=name, aliases=aliases or "", site_url=site_url or "",
-                                image_url=image_url or "", bio_url=bio_url or "",
-                                profile_summary=profile_summary or "")
+                obj = Performer(name=name, **fields)
                 s.add(obj)
-                s.flush()  # get id
+                s.flush()
                 added += 1
-            # cache image (best-effort)
-            if image_url:
-                data = download_file(image_url)
-                if data:
-                    pth = perf_image_path(obj.id)
-                    try:
-                        with open(pth, "wb") as f:
-                            f.write(data)
-                    except Exception:
-                        pass
         s.commit()
-    return templates.TemplateResponse("perf_import.html", {
-        "request": request, "result": {"added": added, "updated": updated}
-    })
+    return templates.TemplateResponse(
+        "perf_import.html",
+        {"request": request, "result": {"added": added, "updated": updated}},
+    )
 
 
 @app.get("/media/{media_id}/zip/{index}")
