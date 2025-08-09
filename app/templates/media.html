@@ -6,14 +6,32 @@
   <p><a class="btn" href="/media/{{ item.id }}/thumbs">Change thumbnail</a></p>
   <div class="media-wrap">
     <div class="video-wrap">
-      <video controls preload="metadata" playsinline>
-        <source src="/stream/{{ item.id }}" type="video/{{ item.ext[1:] }}">
+      <video id="player" controls preload="metadata" playsinline>
+        {% if not play_hls %}<source src="/stream/{{ item.id }}" type="video/{{ item.ext[1:] }}">{% endif %}
       </video>
     </div>
   </div>
   <form method="post" action="/transcode/{{ item.id }}" style="margin-top:10px">
     <button>Transcode to MP4 (cache)</button>
   </form>
+  {% if play_hls %}
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+  (function(){
+    var video = document.getElementById('player');
+    var src = '{{ hls_src }}';
+    if (Hls.isSupported()) {
+      var hls = new Hls();
+      hls.loadSource(src);
+      hls.attachMedia(video);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src;
+    } else {
+      video.outerHTML = '<p>Your browser cannot play this video.</p>';
+    }
+  })();
+  </script>
+  {% endif %}
 
 {% elif item.type == 'image' %}
   <div class="media-wrap">

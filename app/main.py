@@ -178,8 +178,31 @@ def media_detail(request: Request, media_id: int):
                 i = ids.index(m.id)
                 if i>0: prev_id = ids[i-1]
                 if i<len(ids)-1: next_id = ids[i+1]
-
-    return templates.TemplateResponse("media.html", {"request": request, "item": m, "actress": actress, "prev_id": prev_id, "next_id": next_id})
+    play_hls = False
+    hls_src = None
+    if m.type == "video":
+        try:
+            play_hls = not is_directplay_mp4(m.path)
+        except Exception:
+            play_hls = True
+        if play_hls:
+            try:
+                ensure_hls(m.id, m.path)
+                hls_src = f"/transcoded/{m.id}/hls/master.m3u8"
+            except Exception:
+                play_hls = False
+    return templates.TemplateResponse(
+        "media.html",
+        {
+            "request": request,
+            "item": m,
+            "actress": actress,
+            "prev_id": prev_id,
+            "next_id": next_id,
+            "play_hls": play_hls,
+            "hls_src": hls_src,
+        },
+    )
 
 # ----- ZIP routes -----
 def _list_zip_images(zip_path: str):
