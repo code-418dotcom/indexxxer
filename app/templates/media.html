@@ -4,16 +4,22 @@
 
 {% if item.type == 'video' %}
   <p><a class="btn" href="/media/{{ item.id }}/thumbs">Change thumbnail</a></p>
-  <div class="media-wrap">
+  <div class="media-wrap" id="media-wrap">
     <div class="video-wrap">
       <video id="player" controls preload="metadata" playsinline>
         {% if not play_hls %}<source src="/stream/{{ item.id }}" type="video/{{ item.ext[1:] }}">{% endif %}
+        {% for s in subs %}<track src="/media/{{ item.id }}/sub/{{ loop.index0 }}" kind="subtitles" label="Sub {{ loop.index }}" {% if loop.first %}default{% endif %}>{% endfor %}
       </video>
+      <div id="hover-thumb"></div>
     </div>
   </div>
-  <form method="post" action="/transcode/{{ item.id }}" style="margin-top:10px">
-    <button>Transcode to MP4 (cache)</button>
-  </form>
+  <div style="margin-top:8px; display:flex; gap:8px; align-items:center;">
+    <button id="theater-toggle" class="btn">Theater</button>
+    <button id="pip-toggle" class="btn">PiP</button>
+    <form method="post" action="/transcode/{{ item.id }}" style="margin-left:auto">
+      <button>Transcode to MP4 (cache)</button>
+    </form>
+  </div>
   {% if play_hls %}
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script>
@@ -32,6 +38,66 @@
   })();
   </script>
   {% endif %}
+
+  <script>
+  (function(){
+    const video = document.getElementById('player');
+    const mediaId = {{ item.id }};
+    const startPos = {{ start_pos }};
+    if(startPos > 0){ video.currentTime = startPos; }
+    const lsKey = 'media-pos-'+mediaId;
+    const saved = parseFloat(localStorage.getItem(lsKey));
+    if(saved && saved > startPos){ video.currentTime = saved; }
+    function sendProgress(pos){
+      localStorage.setItem(lsKey, pos);
+      if(navigator.sendBeacon){
+        const fd = new FormData();
+        fd.append('position', pos);
+        navigator.sendBeacon('/media/'+mediaId+'/progress', fd);
+      } else {
+        fetch('/media/'+mediaId+'/progress', {method:'POST', body:new URLSearchParams({position:pos}), keepalive:true});
+      }
+    }
+    let throttle;
+    video.addEventListener('timeupdate', ()=>{
+      if(!throttle){ throttle = setTimeout(()=>{ throttle=null; sendProgress(video.currentTime); }, 1000); }
+    });
+
+    window.addEventListener('keydown', e=>{
+      if(document.activeElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+      switch(e.key){
+        case ' ': e.preventDefault(); video.paused?video.play():video.pause(); break;
+        case 'ArrowRight': video.currentTime=Math.min(video.duration, video.currentTime+5); break;
+        case 'ArrowLeft': video.currentTime=Math.max(0, video.currentTime-5); break;
+        case 'f': case 'F': if(!document.fullscreenElement){video.requestFullscreen();} else {document.exitFullscreen();} break;
+        case 'm': case 'M': video.muted=!video.muted; break;
+        case 'p': case 'P': if(document.pictureInPictureElement){document.exitPictureInPicture();} else if(document.pictureInPictureEnabled){video.requestPictureInPicture();} break;
+        case 't': case 'T': document.getElementById('media-wrap').classList.toggle('theater'); break;
+      }
+    });
+
+    document.getElementById('theater-toggle').addEventListener('click', ()=>document.getElementById('media-wrap').classList.toggle('theater'));
+    document.getElementById('pip-toggle').addEventListener('click', ()=>{
+      if(document.pictureInPictureElement){document.exitPictureInPicture();}
+      else if(document.pictureInPictureEnabled){video.requestPictureInPicture();}
+    });
+
+    const hover = document.getElementById('hover-thumb');
+    const wrap = document.querySelector('.video-wrap');
+    const thumbUrls = Array.from({length:6}, (_,i)=>`/media/${mediaId}/thumbs/cand/${i+1}`);
+    thumbUrls.forEach(u=>{const img=new Image();img.src=u;});
+    wrap.addEventListener('mousemove', e=>{
+      const rect = wrap.getBoundingClientRect();
+      const pct = (e.clientX-rect.left)/rect.width;
+      const idx = Math.min(thumbUrls.length-1, Math.floor(pct*thumbUrls.length));
+      hover.style.display='block';
+      hover.style.left = (e.clientX-rect.left-80)+'px';
+      hover.style.top = '-100px';
+      hover.innerHTML = `<img src="${thumbUrls[idx]}" width="160" height="90">`;
+    });
+    wrap.addEventListener('mouseleave', ()=>{hover.style.display='none';});
+  })();
+  </script>
 
 {% elif item.type == 'image' %}
   <div class="media-wrap">
@@ -56,8 +122,8 @@
   <h3>ZIP Contents</h3>
   <div class="grid" id="zip-grid" data-media-id="{{ item.id }}">
     {% for z in range(0, 2000) %}
-      <a class="card lb-link" href="/zip/{{ item.id }}/file/{{ z }}">
-        <img src="/zip/{{ item.id }}/thumb/{{ z }}" onerror="this.parentElement.remove();">
+      <a class="card lb-link" href="/media/{{ item.id }}/zip/{{ z }}">
+        <img src="/media/{{ item.id }}/zip/{{ z }}" onerror="this.parentElement.remove();">
         <div class="meta"><div class="name">Image {{ z+1 }}</div></div>
         <form method="post" action="/media/{{ item.id }}/thumb/zip" style="margin-top:6px">
           <input type="hidden" name="index" value="{{ z }}">

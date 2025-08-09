@@ -117,14 +117,34 @@ def ffprobe_json(path: str) -> dict:
     except Exception:
         return {}
 
-def is_directplay_mp4(path: str) -> bool:
+def is_directplay(path: str) -> bool:
+    """Return True if the container/codec combo is commonly supported by browsers.
+
+    We inspect the first audio and video streams and allow a wider set of
+    formats beyond plain MP4 so we can skip unnecessary transcoding.
+    """
     info = ffprobe_json(path)
-    if not info: return False
-    fmt = (info.get("format") or {}).get("format_name","")
-    if "mp4" not in fmt: return False
-    v = next((s for s in info.get("streams",[]) if s.get("codec_type")=="video"), None)
-    a = next((s for s in info.get("streams",[]) if s.get("codec_type")=="audio"), None)
-    return (v and a and v.get("codec_name") in {"h264"} and a.get("codec_name") in {"aac"})
+    if not info:
+        return False
+    fmt = (info.get("format") or {}).get("format_name", "")
+    v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), None)
+    a = next((s for s in info.get("streams", []) if s.get("codec_type") == "audio"), None)
+    if not v or not a:
+        return False
+    # MP4 containers with H.264/H.265 video and AAC audio
+    if "mp4" in fmt and v.get("codec_name") in {"h264", "hevc"} and a.get("codec_name") in {"aac"}:
+        return True
+    # Matroska/WebM containers with VP8/VP9/AV1 video and Opus/Vorbis/AAC audio
+    if any(x in fmt for x in ["matroska", "webm"]) and \
+        v.get("codec_name") in {"vp8", "vp9", "av1", "h264"} and \
+        a.get("codec_name") in {"opus", "vorbis", "aac"}:
+        return True
+    return False
+
+
+def is_directplay_mp4(path: str) -> bool:
+    """Backwards compatible helper; now delegates to :func:`is_directplay`."""
+    return is_directplay(path)
 
 def hls_dir_for(media_id: int) -> Path:
     return Path(TRANSCODE_DIR) / str(media_id) / "hls"
@@ -142,16 +162,21 @@ def ensure_hls(media_id: int, src_path: str) -> Path:
     if not have_ffmpeg():
         raise RuntimeError("ffmpeg/ffprobe not available in container")
 
-    cmd = [
-        "ffmpeg", "-y", "-i", src_path,
+    encoder = os.getenv("FFMPEG_ENCODER", "h264")
+    hwaccel = os.getenv("FFMPEG_HWACCEL")
+
+    cmd = ["ffmpeg", "-y"]
+    if hwaccel:
+        cmd += ["-hwaccel", hwaccel]
+    cmd += ["-i", src_path,
         "-preset", "veryfast", "-g", "48", "-sc_threshold", "0",
-        "-map", "0:v:0", "-map", "0:a:0", "-c:v:0", "h264", "-c:a:0", "aac",
+        "-map", "0:v:0", "-map", "0:a:0", "-c:v:0", encoder, "-c:a:0", "aac",
         "-b:v:0", "365k", "-maxrate:v:0", "438k", "-bufsize:v:0", "730k",
         "-s:v:0", "426x240", "-b:a:0", "73k",
-        "-map", "0:v:0", "-map", "0:a:0", "-c:v:1", "h264", "-c:a:1", "aac",
+        "-map", "0:v:0", "-map", "0:a:0", "-c:v:1", encoder, "-c:a:1", "aac",
         "-b:v:1", "1050k", "-maxrate:v:1", "1200k", "-bufsize:v:1", "2100k",
         "-s:v:1", "854x480", "-b:a:1", "128k",
-        "-map", "0:v:0", "-map", "0:a:0", "-c:v:2", "h264", "-c:a:2", "aac",
+        "-map", "0:v:0", "-map", "0:a:0", "-c:v:2", encoder, "-c:a:2", "aac",
         "-b:v:2", "3000k", "-maxrate:v:2", "3300k", "-bufsize:v:2", "6000k",
         "-s:v:2", "1280x720", "-b:a:2", "192k",
         "-var_stream_map", "v:0,a:0 v:1,a:1 v:2,a:2",
@@ -160,8 +185,7 @@ def ensure_hls(media_id: int, src_path: str) -> Path:
         "-hls_playlist_type", "vod",
         "-master_pl_name", "master.m3u8",
         "-hls_segment_filename", str(out_dir / "v%v" / "seg_%03d.ts"),
-        str(out_dir / "v%v" / "stream.m3u8"),
-    ]
+        str(out_dir / "v%v" / "stream.m3u8"),]
     proc = subprocess.run(cmd, cwd=str(out_dir))
     if proc.returncode != 0 or not master.exists():
         raise RuntimeError("HLS generation failed")
@@ -198,6 +222,36 @@ def candidate_dir_for(media_id: int) -> str:
     d = os.path.join(THUMB_DIR, str(media_id), "candidates")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def find_subtitles(src_path: str) -> list[str]:
+    """Return a list of WebVTT subtitle paths for a given media file.
+
+    Looks for `.vtt` or `.srt` files next to the source video. SRT files are
+    converted to VTT on the fly using ffmpeg if a corresponding VTT does not
+    already exist.
+    """
+    base = os.path.splitext(src_path)[0]
+    subs = []
+    for ext in (".vtt", ".srt"):
+        cand = base + ext
+        if not os.path.exists(cand):
+            continue
+        if ext == ".srt":
+            vtt = base + ".vtt"
+            if not os.path.exists(vtt):
+                try:
+                    subprocess.run(
+                        ["ffmpeg", "-y", "-i", cand, vtt],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=True,
+                    )
+                except Exception:
+                    continue
+            cand = vtt
+        subs.append(cand)
+    return subs
 
 def generate_thumb_candidates(src_path: str, out_dir: str, count: int = 6) -> list[str]:
     os.makedirs(out_dir, exist_ok=True)
