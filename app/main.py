@@ -267,8 +267,6 @@ def stream_master(media_id: int):
         master = ensure_hls(media_id, str(src))
         return FileResponse(str(master), media_type="application/vnd.apple.mpegurl")
 
-from fastapi import UploadFile
-
 @app.get("/media/{media_id}/thumbs", response_class=HTMLResponse)
 def thumb_picker(request: Request, media_id: int):
     with get_session() as s:
@@ -315,17 +313,6 @@ def cand_image(media_id: int, idx: int):
         if idx < 1 or idx > len(files):
             raise HTTPException(404)
         return FileResponse(files[idx-1])
-
-@app.get("/media/{media_id}/thumbs", response_class=HTMLResponse)
-def thumb_picker(request: Request, media_id: int):
-    with get_session() as s:
-        mobj = s.get(Media, media_id)
-        if not mobj: raise HTTPException(404)
-        if mobj.type != "video":
-            return RedirectResponse(url=f"/media/{media_id}")
-        cdir = candidate_dir_for(media_id)
-        files = generate_thumb_candidates(mobj.path, cdir, count=6)
-        return templates.TemplateResponse("thumb_picker.html", {"request": request, "item": mobj, "count": len(files)})
 
 
 @app.post("/maintenance/clear/run", response_class=HTMLResponse)
@@ -403,7 +390,15 @@ def performers_list(request: Request, q: str = "", page: int = 1, per: int = 48)
         total = base.count()
         items = base.order_by(Performer.name.asc()).offset((page-1)*per).limit(per).all()
         # media counts by name match
-        name_counts = {n: c for n, c in s.query(Media.actress_name, func.count(Media.id)).group_by(Media.actress_name).all()}
+        name_counts = {
+            n: c
+            for n, c in (
+                s.query(Actress.name, func.count(Media.id))
+                .join(Media, Media.actress_id == Actress.id)
+                .group_by(Actress.name)
+                .all()
+            )
+        }
     pages = (total + per - 1)//per
     return templates.TemplateResponse("performers.html", {
         "request": request, "items": items, "q": q, "page": page, "pages": pages, "per": per,
@@ -416,7 +411,13 @@ def performer_detail(request: Request, pid: int):
         p = s.get(Performer, pid)
         if not p:
             raise HTTPException(404)
-        media = s.query(Media).filter(Media.actress_name == p.name).order_by(Media.id.desc()).all()
+        media = (
+            s.query(Media)
+            .join(Actress, Media.actress_id == Actress.id)
+            .filter(Actress.name == p.name)
+            .order_by(Media.id.desc())
+            .all()
+        )
     return templates.TemplateResponse("performer.html", {
         "request": request, "p": p, "media": media
     })
@@ -499,7 +500,7 @@ def zip_image(media_id: int, index: int):
         mobj = s.get(Media, media_id)
         if not mobj or mobj.type != "zip":
             raise HTTPException(404)
-    names = _zip_image_names(mobj.path)
+    names = _list_zip_images(mobj.path)
     if index < 0 or index >= len(names):
         raise HTTPException(404)
     # prefer cache
@@ -553,7 +554,7 @@ def maintenance_prewarm(request: Request, background: BackgroundTasks, limit: in
                 for i, item in enumerate(zips, 1):
                     PREWARM.current = item.filename
                     try:
-                        names = _zip_image_names(item.path)[:limit]
+                        names = _list_zip_images(item.path)[:limit]
                         cdir = zip_cache_dir_for(item.id)
                         for idx, name in enumerate(names):
                             out = os.path.join(cdir, f"{idx:04d}.jpg")
