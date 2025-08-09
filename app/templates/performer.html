@@ -7,11 +7,35 @@
   <div>
     <h2>{{ p.name }}</h2>
     {% if p.aliases %}<div><strong>Aliases:</strong> {{ p.aliases }}</div>{% endif %}
-    {% if p.site_url %}<div><a href="{{ p.site_url }}" target="_blank">Official site</a></div>{% endif %}
-    {% if p.bio_url %}<div><a href="{{ p.bio_url }}" target="_blank">Bio</a></div>{% endif %}
-    {% if p.profile_summary %}<p style="max-width:60ch">{{ p.profile_summary }}</p>{% endif %}
+    <a href="/performer/{{ p.id }}/edit" class="btn" style="margin-top:8px">Edit</a>
   </div>
 </div>
+
+<table class="perf-details" style="margin-top:16px;width:100%;max-width:400px">
+  {% if p.dob %}<tr><th>Date of birth</th><td>{{ p.dob }}</td></tr>{% endif %}
+  {% if p.age %}<tr><th>Age</th><td>{{ p.age }}</td></tr>{% endif %}
+  {% if p.career_status %}<tr><th>Career status</th><td>{{ p.career_status }}</td></tr>{% endif %}
+  {% if p.career_start %}<tr><th>Career start</th><td>{{ p.career_start }}</td></tr>{% endif %}
+  {% if p.career_end %}<tr><th>Career end</th><td>{{ p.career_end }}</td></tr>{% endif %}
+  {% if p.dod %}<tr><th>Date of death</th><td>{{ p.dod }}</td></tr>{% endif %}
+  {% if p.pob %}<tr><th>Place of birth</th><td>{{ p.pob }}</td></tr>{% endif %}
+  {% if p.ethnicity %}<tr><th>Ethnicity</th><td>{{ p.ethnicity }}</td></tr>{% endif %}
+  {% if p.boobs %}<tr><th>Boobs</th><td>{{ p.boobs }}</td></tr>{% endif %}
+  {% if p.bust %}<tr><th>Bust</th><td>{{ p.bust }}</td></tr>{% endif %}
+  {% if p.cup %}<tr><th>Cup</th><td>{{ p.cup }}</td></tr>{% endif %}
+  {% if p.bra %}<tr><th>Bra</th><td>{{ p.bra }}</td></tr>{% endif %}
+  {% if p.waist %}<tr><th>Waist</th><td>{{ p.waist }}</td></tr>{% endif %}
+  {% if p.hip %}<tr><th>Hip</th><td>{{ p.hip }}</td></tr>{% endif %}
+  {% if p.butt %}<tr><th>Butt</th><td>{{ p.butt }}</td></tr>{% endif %}
+  {% if p.height %}<tr><th>Height</th><td>{{ p.height }}</td></tr>{% endif %}
+  {% if p.weight %}<tr><th>Weight</th><td>{{ p.weight }}</td></tr>{% endif %}
+  {% if p.hair_color %}<tr><th>Hair Color</th><td>{{ p.hair_color }}</td></tr>{% endif %}
+  {% if p.eye_color %}<tr><th>Eye Color</th><td>{{ p.eye_color }}</td></tr>{% endif %}
+  {% if p.piercings %}<tr><th>Piercings</th><td>{{ p.piercings }}</td></tr>{% endif %}
+  {% if p.piercing_locations %}<tr><th>Piercing locations</th><td>{{ p.piercing_locations }}</td></tr>{% endif %}
+  {% if p.tattoos %}<tr><th>Tattoos</th><td>{{ p.tattoos }}</td></tr>{% endif %}
+  {% if p.tattoo_locations %}<tr><th>Tattoo locations</th><td>{{ p.tattoo_locations }}</td></tr>{% endif %}
+</table>
 
 <h3 style="margin-top:20px">Media with {{ p.name }}</h3>
 <div class="grid">
