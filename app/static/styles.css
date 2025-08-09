@@ -38,6 +38,9 @@ main{padding:16px;max-width:var(--maxw);margin:0 auto}
 .meta .name{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta .sub{font-size:12px;color:var(--muted)}
 
+table.perf-details{border-collapse:collapse;margin-top:8px}
+table.perf-details th,table.perf-details td{padding:4px 8px;text-align:left}
+
 /* Fluid media */
 .media-wrap{width:100%;max-width:var(--maxw);margin:0 auto;border:1px solid #242835;background:#0b0d12;border-radius:12px;overflow:hidden}
 .video-wrap{position:relative;width:100%;aspect-ratio:16/9;background:#000}
