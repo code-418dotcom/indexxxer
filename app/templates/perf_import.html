@@ -1,0 +1,15 @@
+
+{% extends "base.html" %}
+{% block title %}Import performers{% endblock %}
+{% block content %}
+<h2>Import performers (CSV)</h2>
+<form action="/maintenance/performers/import" method="post" enctype="multipart/form-data" style="margin:10px 0">
+  <input type="file" name="file" accept=".csv" required>
+  <button>Upload & Import</button>
+</form>
+{% if result %}
+  <p>Added: {{ result.added }}, Updated: {{ result.updated }}</p>
+{% endif %}
+<p style="opacity:.7">The importer is tolerant to columns; it looks for: <code>name</code>, <code>aliases</code>, <code>url</code>, <code>image_url</code>, <code>bio_url</code>, <code>profile_summary</code>.</p>
+<a href="/performers" class="btn">View performers</a>
+{% endblock %}

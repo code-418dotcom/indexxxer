@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ item.filename }} <small>({{ actress.name }})</small></h2>
+
+{% if item.type == 'video' %}
+  <p><a class="btn" href="/media/{{ item.id }}/thumbs">Change thumbnail</a></p>
+  <div class="media-wrap">
+    <div class="video-wrap">
+      <video controls preload="metadata" playsinline>
+        <source src="/stream/{{ item.id }}" type="video/{{ item.ext[1:] }}">
+      </video>
+    </div>
+  </div>
+  <form method="post" action="/transcode/{{ item.id }}" style="margin-top:10px">
+    <button>Transcode to MP4 (cache)</button>
+  </form>
+
+{% elif item.type == 'image' %}
+  <div class="media-wrap">
+    <img class="detail-img" src="/stream/{{ item.id }}" alt="{{ item.filename }}" id="solo-image">
+  </div>
+  <div style="margin-top:8px; display:flex; gap:8px;">
+    {% if prev_id %}<a class="btn" href="/media/{{ prev_id }}">◀ Prev</a>{% endif %}
+    {% if next_id %}<a class="btn" href="/media/{{ next_id }}">Next ▶</a>{% endif %}
+  </div>
+  <script>
+  (function(){
+    const prev = {{ prev_id if prev_id else 'null' }};
+    const next = {{ next_id if next_id else 'null' }};
+    window.addEventListener('keydown', e=>{
+      if(e.key === 'ArrowLeft' && prev){ window.location.href = '/media/'+prev; }
+      if(e.key === 'ArrowRight' && next){ window.location.href = '/media/'+next; }
+    });
+  })();
+  </script>
+
+{% elif item.type == 'zip' %}
+  <h3>ZIP Contents</h3>
+  <div class="grid" id="zip-grid" data-media-id="{{ item.id }}">
+    {% for z in range(0, 2000) %}
+      <a class="card lb-link" href="/zip/{{ item.id }}/file/{{ z }}">
+        <img src="/zip/{{ item.id }}/thumb/{{ z }}" onerror="this.parentElement.remove();">
+        <div class="meta"><div class="name">Image {{ z+1 }}</div></div>
+        <form method="post" action="/media/{{ item.id }}/thumb/zip" style="margin-top:6px">
+          <input type="hidden" name="index" value="{{ z }}">
+          <button class="btn" type="submit">Set cover</button>
+        </form>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="lb" id="lightbox" aria-hidden="true">
+    <div class="nav">
+      <button id="lb-prev" aria-label="Previous">‹</button>
+      <button id="lb-next" aria-label="Next">›</button>
+    </div>
+    <button class="close" id="lb-close" aria-label="Close">✕</button>
+    <img id="lb-img" alt="">
+  </div>
+
+  <script>
+  (function(){
+    const grid = document.getElementById('zip-grid');
+    const links = Array.from(grid.querySelectorAll('.lb-link'));
+    const lb = document.getElementById('lightbox');
+    const img = document.getElementById('lb-img');
+    const prev = document.getElementById('lb-prev');
+    const next = document.getElementById('lb-next');
+    const closeBtn = document.getElementById('lb-close');
+    let idx = -1;
+    function openAt(i){
+      if(i<0 || i>=links.length) return;
+      idx = i; img.src = links[idx].href;
+      lb.classList.add('open'); lb.setAttribute('aria-hidden','false');
+    }
+    function close(){ lb.classList.remove('open'); lb.setAttribute('aria-hidden','true'); img.removeAttribute('src'); }
+    function step(d){ openAt((idx + d + links.length) % links.length); }
+    links.forEach((a,i)=>a.addEventListener('click', e=>{ e.preventDefault(); openAt(i); }));
+    prev.addEventListener('click', ()=>step(-1));
+    next.addEventListener('click', ()=>step(1));
+    closeBtn.addEventListener('click', close);
+    lb.addEventListener('click', e=>{ if(e.target===lb) close(); });
+    window.addEventListener('keydown', e=>{
+      if(lb.classList.contains('open')){
+        if(e.key==='ArrowLeft') step(-1);
+        else if(e.key==='ArrowRight') step(1);
+        else if(e.key==='Escape') close();
+      }
+    });
+  })();
+  </script>
+
+{% else %}
+  <p>Unsupported type.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  indexxxer:
+    build: .
+    container_name: indexxxer
+    ports:
+      - "12345:8080"
+    environment:
+      - TZ=Europe/Amsterdam
+      - INDEX_ROOT=/data
+      - THUMB_DIR=/app/app/thumbs
+      - TRANSCODE_DIR=/app/app/transcoded
+      - DB_PATH=/app/app/db/media.db
+      - DEBUG_MODE=true
+      - INCLUDE_PDF=false
+      - ACTRESS_NAME=Tiffany Thompson
+    volumes:
+      - /volume3/docker/indexxxer/db:/app/app/db
+      - /volume3/docker/indexxxer/thumbs:/app/app/thumbs
+      - /volume3/docker/indexxxer/transcoded:/app/app/transcoded
+      - "/volume3/x_adult/babes/Tiffany Thompson:/data:ro"

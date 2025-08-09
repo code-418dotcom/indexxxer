@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Maintenance</h2>
+<p>Remove any previously indexed non-media items (keeps only video / image / zip).</p>
+<form action="/maintenance/clean/run" method="post">
+  <button>Clean database</button>
+</form>
+{% if result %}
+  <p class="muted">Removed {{ result.removed }}; Kept {{ result.kept }}.</p>
+{% endif %}
+
+<hr>
+<h3>Danger zone</h3>
+<p>Clear all indexed records and delete all generated thumbnails. Your media files on disk are untouched.</p>
+<form action="/maintenance/clear/run" method="post" onsubmit="return confirm('This will remove all indexed items and thumbnails. Continue?');">
+  <button class="btn">Clear Database</button>
+</form>
+
+
+<h3>Performance</h3>
+<p>Pre-extract and cache previews for all ZIP files to speed up opening.</p>
+<form action="/maintenance/prewarm_zips" method="post">
+  <button class="btn">Preload ZIP previews</button>
+</form>
+{% endblock %}
+

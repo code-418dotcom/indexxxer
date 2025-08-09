@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Choose thumbnail for {{ item.filename }}</h2>
+<form method="post" action="/media/{{ item.id }}/thumb/select" id="thumbForm">
+  <input type="hidden" name="idx" id="idx_hidden" value="1">
+  <div class="grid">
+    {% for c in candidates %}
+    <label class="card" style="cursor:pointer" onclick="document.getElementById('idx_hidden').value={{ loop.index }};">
+      <img src="/media/{{ item.id }}/thumbs/cand/{{ loop.index }}" alt="candidate">
+      <div class="meta">
+        <input type="radio" name="idx_radio" value="{{ loop.index }}"{% if loop.first %} checked{% endif %} required
+               onclick="document.getElementById('idx_hidden').value=this.value;">
+        Use this
+      </div>
+    </label>
+    {% endfor %}
+  </div>
+  <button type="submit" style="margin-top:10px">Save</button>
+  <a class="btn" href="/media/{{ item.id }}">Cancel</a>
+</form>
+{% endblock %}
+

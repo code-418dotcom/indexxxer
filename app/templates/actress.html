@@ -1,0 +1,32 @@
+
+<style>
+.card-actions{position:absolute; top:8px; right:8px;}
+.menu-btn{background:#00000080;color:#fff;border:0;border-radius:6px;padding:2px 8px;cursor:pointer}
+.menu{position:absolute; right:8px; top:34px; background:#111; color:#fff; border:1px solid #333;
+      border-radius:8px; min-width:160px; display:none; z-index:10; box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.menu a{display:block; padding:8px 12px; color:#fff; text-decoration:none}
+.menu a:hover{background:#222}
+</style>
+<script>
+document.addEventListener('click', function(e){
+  document.querySelectorAll('.menu').forEach(m=>m.style.display='none');
+  if(e.target.classList.contains('menu-btn')){
+    e.preventDefault();
+    const menu = e.target.closest('.card').querySelector('.menu');
+    if(menu){ menu.style.display = 'block'; e.stopPropagation(); }
+  }
+}, true);
+</script>
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ actress.name }}</h2>
+<div class="grid">
+{% for m in items %}
+  <a class="card" href="/media/{{m.id}}">
+    {% if m.thumb_path %}<img src="/thumb/{{m.id}}" alt="{{m.filename}}">{% else %}
+    <div class="no-thumb">{{m.ext|upper}}</div>{% endif %}
+    <div class="meta"><div class="name">{{m.filename}}</div></div>
+  </a>
+{% endfor %}
+</div>
+{% endblock %}

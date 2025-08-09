@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Indexxxer</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header>
+    <h1><a href="/">Indexxxer</a></h1>
+    <nav>
+      <a class="btn" href="/scan" id="scanBtn" id="scanBtn">Scan</a>
+      <form action="/search" method="get" class="search">
+        <input type="text" name="q" placeholder="Search filename...">
+        <select name="actress">
+          <option value="">All actresses</option>
+          {% for a in actresses %}
+          <option value="{{a.name}}" {% if selected_actress==a.name %}selected{% endif %}>{{a.name}}</option>
+          {% endfor %}
+        </select>
+        <select name="type">
+          <option value="">All</option>
+          <option value="video" {% if selected_type=='video' %}selected{% endif %}>Videos</option>
+          <option value="image" {% if selected_type=='image' %}selected{% endif %}>Images</option>
+          <option value="zip" {% if selected_type=='zip' %}selected{% endif %}>Zips</option>
+        </select>
+        <button type="submit">Go</button>
+      </form>
+      <a class="btn" href="/maintenance/clean">Maintenance</a> &nbsp; <a href="/performers">Performers</a>
+    </nav>
+    <div class="status"><span id="scan-status">Idle</span></div>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+async function updateScanStatus(){
+  try{
+    const r = await fetch('/scan/status', {cache:'no-store'});
+    if(!r.ok) return;
+    const d = await r.json();
+    const el = document.getElementById('scan-status');
+    if(el){
+      const file = d.current_file ? ' — ' + d.current_file : '';
+      el.textContent = `${d.status}: ${d.processed_count}/${d.total_count}${file}`;
+    }
+  }catch(e){}
+}
+setInterval(updateScanStatus,1500); updateScanStatus();
+  </script>
+</body>
+</html>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const btn = document.getElementById("scanBtn");
+  if (!btn) return;
+  btn.addEventListener("click", function(e){
+    e.preventDefault();
+    const orig = btn.textContent;
+    btn.textContent = "Scanning...";
+    btn.classList.add("disabled");
+    fetch("/scan").then(r=>{
+      if(!r.ok) throw new Error("Scan failed");
+      return r.text();
+    }).then(()=>{
+      btn.textContent = orig;
+      btn.classList.remove("disabled");
+      location.reload();
+    }).catch(err=>{
+      console.error(err);
+      btn.textContent = "Scan (Error)";
+      btn.classList.remove("disabled");
+      setTimeout(()=>btn.textContent=orig, 3000);
+    });
+  });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const link = document.querySelector('#scanBtn') || document.querySelector('a[href="/scan"]');
+  if (!link) return;
+  link.addEventListener("click", function(e){
+    e.preventDefault();
+    const btn = link;
+    const orig = btn.textContent;
+    btn.textContent = "Scanning…";
+    btn.classList.add("disabled");
+    let seenRunning = false;
+    let attempts = 0;
+    const poll = () => fetch("/scan/status").then(r=>r.json()).then(s=>{
+      attempts++;
+      if (s && s.running) {
+        seenRunning = True = true;
+        btn.textContent = "Scanning… " + (s.done||0) + "/" + (s.total||0);
+      }
+      if (seenRunning && (!s || !s.running)) {
+        clearInterval(timer);
+        btn.textContent = orig;
+        btn.classList.remove("disabled");
+        location.reload();
+      } else if (!seenRunning && attempts > 15) {
+        clearInterval(timer);
+        btn.textContent = orig;
+        btn.classList.remove("disabled");
+      }
+    }).catch(()=>{});
+    fetch("/scan").catch(()=>{});
+    const timer = setInterval(poll, 1000);
+    poll();
+  });
+});
+</script>
