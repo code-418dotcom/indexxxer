@@ -56,8 +56,8 @@
   <h3>ZIP Contents</h3>
   <div class="grid" id="zip-grid" data-media-id="{{ item.id }}">
     {% for z in range(0, 2000) %}
-      <a class="card lb-link" href="/zip/{{ item.id }}/file/{{ z }}">
-        <img src="/zip/{{ item.id }}/thumb/{{ z }}" onerror="this.parentElement.remove();">
+      <a class="card lb-link" href="/media/{{ item.id }}/zip/{{ z }}">
+        <img src="/media/{{ item.id }}/zip/{{ z }}" onerror="this.parentElement.remove();">
         <div class="meta"><div class="name">Image {{ z+1 }}</div></div>
         <form method="post" action="/media/{{ item.id }}/thumb/zip" style="margin-top:6px">
           <input type="hidden" name="index" value="{{ z }}">
