@@ -22,6 +22,7 @@ class Media(SQLModel, table=True):
     height: Optional[int] = None
     size_bytes: Optional[int] = None
     thumb_path: Optional[str] = None
+    last_position: Optional[float] = None
 
 
 # ----------------------

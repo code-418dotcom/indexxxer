@@ -27,10 +27,11 @@ from .utils import (
     zip_cache_dir_for,
     hls_dir_for,
     hls_master_path,
-    is_directplay_mp4,
+    is_directplay,
     thumb_from_bytes,
     perf_image_path,
     download_file,
+    find_subtitles,
 )
 
 
@@ -180,9 +181,11 @@ def media_detail(request: Request, media_id: int):
                 if i<len(ids)-1: next_id = ids[i+1]
     play_hls = False
     hls_src = None
+    subs: list[str] = []
+    start_pos = m.last_position or 0.0
     if m.type == "video":
         try:
-            play_hls = not is_directplay_mp4(m.path)
+            play_hls = not is_directplay(m.path)
         except Exception:
             play_hls = True
         if play_hls:
@@ -191,6 +194,10 @@ def media_detail(request: Request, media_id: int):
                 hls_src = f"/transcoded/{m.id}/hls/master.m3u8"
             except Exception:
                 play_hls = False
+        try:
+            subs = find_subtitles(m.path)
+        except Exception:
+            subs = []
     return templates.TemplateResponse(
         "media.html",
         {
@@ -201,6 +208,8 @@ def media_detail(request: Request, media_id: int):
             "next_id": next_id,
             "play_hls": play_hls,
             "hls_src": hls_src,
+            "subs": subs,
+            "start_pos": start_pos,
         },
     )
 
@@ -232,11 +241,16 @@ def transcode(media_id: int):
 
     # Fallback: real transcode
     tmp = out + ".tmp"
-    t = subprocess.run(["ffmpeg","-y","-i", m.path,
-                        "-c:v","libx264","-preset","veryfast","-crf","22",
-                        "-c:a","aac","-b:a","160k",
-                        "-movflags","+faststart", tmp],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    encoder = os.getenv("FFMPEG_ENCODER", "libx264")
+    hwaccel = os.getenv("FFMPEG_HWACCEL")
+    cmd = ["ffmpeg", "-y"]
+    if hwaccel:
+        cmd += ["-hwaccel", hwaccel]
+    cmd += ["-i", m.path,
+            "-c:v", encoder, "-preset", "veryfast", "-crf", "22",
+            "-c:a", "aac", "-b:a", "160k",
+            "-movflags", "+faststart", tmp]
+    t = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if t.returncode != 0 or not os.path.exists(tmp) or os.path.getsize(tmp) <= 1000:
         if os.path.exists(tmp): os.remove(tmp)
         raise HTTPException(500, "Transcode failed")
@@ -254,6 +268,30 @@ def stream_master(media_id: int):
             raise HTTPException(404, "Source missing")
         master = ensure_hls(media_id, str(src))
         return FileResponse(str(master), media_type="application/vnd.apple.mpegurl")
+
+
+@app.get("/media/{media_id}/sub/{idx}")
+def subtitle(media_id: int, idx: int):
+    with get_session() as s:
+        m = s.get(Media, media_id)
+        if not m or m.type != "video":
+            raise HTTPException(404)
+        subs = find_subtitles(m.path)
+    if idx < 0 or idx >= len(subs):
+        raise HTTPException(404)
+    return FileResponse(subs[idx], media_type="text/vtt")
+
+
+@app.post("/media/{media_id}/progress")
+def save_progress(media_id: int, position: float = Form(...)):
+    with get_session() as s:
+        m = s.get(Media, media_id)
+        if not m:
+            raise HTTPException(404)
+        m.last_position = position
+        s.add(m)
+        s.commit()
+    return {"status": "ok"}
 
 @app.get("/media/{media_id}/thumbs", response_class=HTMLResponse)
 def thumb_picker(request: Request, media_id: int):

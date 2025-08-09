@@ -43,8 +43,11 @@ table.perf-details th,table.perf-details td{padding:4px 8px;text-align:left}
 
 /* Fluid media */
 .media-wrap{width:100%;max-width:var(--maxw);margin:0 auto;border:1px solid #242835;background:#0b0d12;border-radius:12px;overflow:hidden}
+.media-wrap.theater{max-width:none;width:100%}
 .video-wrap{position:relative;width:100%;aspect-ratio:16/9;background:#000}
 .video-wrap video{position:absolute;inset:0;width:100%;height:100%}
+.video-wrap #hover-thumb{position:absolute;display:none;pointer-events:none}
+.video-wrap #hover-thumb img{width:160px;height:90px;object-fit:cover;border:1px solid #242835}
 .detail-img{width:100%;height:auto;display:block}
 
 /* Lightbox */
