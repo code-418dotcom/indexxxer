@@ -21,6 +21,7 @@ export default function PerformerDetail({ params }: { params: { id: string } }) 
   const [linkedMedia, setLinkedMedia] = useState<any[]>([]);
   const [err, setErr] = useState("");
   const [playing, setPlaying] = useState<string | null>(null);
+  const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +68,143 @@ export default function PerformerDetail({ params }: { params: { id: string } }) 
     return items.filter((x) => String(x.rel_path || "").toLowerCase().includes(first)).slice(0, 60);
   }, [items, p, linkedMedia]);
 
+  const imageMatches = useMemo(() => matches.filter((m) => m.kind === "image"), [matches]);
+  const videoMatches = useMemo(() => matches.filter((m) => m.kind === "video"), [matches]);
+
+  useEffect(() => {
+    // Close image modal if the list changes (e.g. performer switch)
+    setActiveImageIndex(null);
+  }, [imageMatches]);
+
+  useEffect(() => {
+    if (activeImageIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setActiveImageIndex((idx) => {
+          if (idx === null || !imageMatches.length) return idx;
+          return (idx - 1 + imageMatches.length) % imageMatches.length;
+        });
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setActiveImageIndex((idx) => {
+          if (idx === null || !imageMatches.length) return idx;
+          return (idx + 1) % imageMatches.length;
+        });
+      } else if (e.key === "Escape") {
+        setActiveImageIndex(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeImageIndex, imageMatches]);
+
+  const renderGrid = (list: MediaItem[], kind: "image" | "video") => (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+      {list.map((m, idx) => (
+        <div
+          key={m.id}
+          style={{
+            border: "none",
+            borderRadius: 16,
+            overflow: "hidden",
+            background: "white",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            transition: "all 0.2s",
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            if (kind === "video") {
+              setPlaying(m.rel_path);
+            } else {
+              setActiveImageIndex(idx);
+            }
+          }}
+          onMouseEnter={(e) => {
+            if (kind === "video") {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.12)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (kind === "video") {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)";
+            }
+          }}
+        >
+          <div
+            style={{
+              aspectRatio: "16/10",
+              background: "linear-gradient(135deg, rgba(0,0,0,0.03), rgba(0,0,0,0.06))",
+              position: "relative",
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <img
+              src={`/api/media/thumb?rel_path=${encodeURIComponent(m.rel_path)}`}
+              alt={m.rel_path}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = "none";
+              }}
+            />
+            {kind === "video" && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: 48,
+                  height: 48,
+                  borderRadius: "50%",
+                  background: "rgba(102, 126, 234, 0.9)",
+                  display: "grid",
+                  placeItems: "center",
+                  color: "white",
+                  fontSize: 20,
+                }}
+              >
+                ▶
+              </div>
+            )}
+            <div
+              style={{
+                position: "absolute",
+                bottom: 8,
+                right: 8,
+                fontSize: 10,
+                padding: "4px 8px",
+                borderRadius: 8,
+                background: "rgba(0,0,0,0.75)",
+                color: "white",
+                fontWeight: 600,
+                textTransform: "uppercase",
+              }}
+            >
+              {m.kind}
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: 12,
+              fontSize: 11,
+              fontFamily: "ui-monospace, SFMono-Regular",
+              opacity: 0.7,
+              wordBreak: "break-word",
+              lineHeight: 1.4,
+            }}
+          >
+            {m.rel_path.split("/").pop()}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <main style={{ padding: 24, maxWidth: 1200, margin: "0 auto" }}>
       <a href="/" style={{ textDecoration: "none", color: "black", opacity: 0.75 }}>
@@ -98,110 +236,140 @@ export default function PerformerDetail({ params }: { params: { id: string } }) 
           </div>
 
           {matches.length ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
-              {matches.map((m) => (
-                <div
-                  key={m.id}
-                  style={{
-                    border: "none",
-                    borderRadius: 16,
-                    overflow: "hidden",
-                    background: "white",
-                    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-                    transition: "all 0.2s",
-                    cursor: m.kind === "video" ? "pointer" : "default",
-                  }}
-                  onClick={() => {
-                    if (m.kind === "video") {
-                      setPlaying(m.rel_path);
-                    }
-                  }}
-                  onMouseEnter={(e) => {
-                    if (m.kind === "video") {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.12)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (m.kind === "video") {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.08)";
-                    }
-                  }}
-                >
-                  <div
-                    style={{
-                      aspectRatio: "16/10",
-                      background: "linear-gradient(135deg, rgba(0,0,0,0.03), rgba(0,0,0,0.06))",
-                      position: "relative",
-                      display: "grid",
-                      placeItems: "center",
-                    }}
-                  >
-                    <img
-                      src={`/api/media/thumb?rel_path=${encodeURIComponent(m.rel_path)}`}
-                      alt={m.rel_path}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                    {m.kind === "video" && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "50%",
-                          left: "50%",
-                          transform: "translate(-50%, -50%)",
-                          width: 48,
-                          height: 48,
-                          borderRadius: "50%",
-                          background: "rgba(102, 126, 234, 0.9)",
-                          display: "grid",
-                          placeItems: "center",
-                          color: "white",
-                          fontSize: 20,
-                        }}
-                      >
-                        ▶
-                      </div>
-                    )}
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: 8,
-                        right: 8,
-                        fontSize: 10,
-                        padding: "4px 8px",
-                        borderRadius: 8,
-                        background: "rgba(0,0,0,0.75)",
-                        color: "white",
-                        fontWeight: 600,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {m.kind}
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      padding: 12,
-                      fontSize: 11,
-                      fontFamily: "ui-monospace, SFMono-Regular",
-                      opacity: 0.7,
-                      wordBreak: "break-word",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {m.rel_path.split("/").pop()}
-                  </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {imageMatches.length ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ fontWeight: 700 }}>Images ({imageMatches.length})</div>
+                  {renderGrid(imageMatches, "image")}
                 </div>
-              ))}
+              ) : null}
+
+              {videoMatches.length ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ fontWeight: 700 }}>Videos ({videoMatches.length})</div>
+                  {renderGrid(videoMatches, "video")}
+                </div>
+              ) : null}
             </div>
           ) : (
             <div style={{ padding: 24, opacity: 0.6, fontSize: 14, border: "2px dashed rgba(0,0,0,0.1)", borderRadius: 16, textAlign: "center" }}>
               No matches yet. Use <b>Tools → Index now</b> to build the media index.
+            </div>
+          )}
+
+          {activeImageIndex !== null && imageMatches[activeImageIndex] && (
+            <div
+              onClick={() => setActiveImageIndex(null)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.9)",
+                display: "grid",
+                placeItems: "center",
+                padding: 24,
+                zIndex: 9999,
+                cursor: "pointer",
+              }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: "relative",
+                  maxWidth: "90vw",
+                  maxHeight: "90vh",
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+                  cursor: "default",
+                }}
+              >
+                <button
+                  onClick={() => setActiveImageIndex(null)}
+                  style={{
+                    position: "absolute",
+                    top: 16,
+                    right: 16,
+                    width: 40,
+                    height: 40,
+                    borderRadius: "50%",
+                    border: "none",
+                    background: "rgba(0,0,0,0.7)",
+                    color: "white",
+                    fontSize: 20,
+                    cursor: "pointer",
+                    zIndex: 10,
+                  }}
+                >
+                  ✕
+                </button>
+
+                {imageMatches.length > 1 && (
+                  <>
+                    <button
+                      onClick={() =>
+                        setActiveImageIndex((idx) => {
+                          if (idx === null || !imageMatches.length) return idx;
+                          return (idx - 1 + imageMatches.length) % imageMatches.length;
+                        })
+                      }
+                      style={{
+                        position: "absolute",
+                        left: 16,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 44,
+                        height: 44,
+                        borderRadius: "50%",
+                        border: "none",
+                        background: "rgba(0,0,0,0.65)",
+                        color: "white",
+                        fontSize: 20,
+                        cursor: "pointer",
+                        zIndex: 10,
+                      }}
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={() =>
+                        setActiveImageIndex((idx) => {
+                          if (idx === null || !imageMatches.length) return idx;
+                          return (idx + 1) % imageMatches.length;
+                        })
+                      }
+                      style={{
+                        position: "absolute",
+                        right: 16,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: 44,
+                        height: 44,
+                        borderRadius: "50%",
+                        border: "none",
+                        background: "rgba(0,0,0,0.65)",
+                        color: "white",
+                        fontSize: 20,
+                        cursor: "pointer",
+                        zIndex: 10,
+                      }}
+                    >
+                      →
+                    </button>
+                  </>
+                )}
+
+                <img
+                  src={`/api/media/stream?rel_path=${encodeURIComponent(imageMatches[activeImageIndex].rel_path)}`}
+                  alt={imageMatches[activeImageIndex].rel_path}
+                  style={{
+                    maxWidth: "90vw",
+                    maxHeight: "90vh",
+                    display: "block",
+                    objectFit: "contain",
+                    background: "rgba(0,0,0,0.4)",
+                  }}
+                />
+              </div>
             </div>
           )}
 
