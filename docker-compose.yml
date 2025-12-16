@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: indexxxer
+      POSTGRES_USER: indexxxer
+      POSTGRES_PASSWORD: indexxxer
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    image: indexxxer-api:0.3.0
+    build:
+      context: ./backend
+      args:
+        CACHEBUST: "1765744000"
+    environment:
+      APP_NAME: indexxxer
+      APP_VERSION: "0.3.0"
+      DATABASE_URL: postgresql+psycopg://indexxxer:indexxxer@db:5432/indexxxer
+      CORS_ORIGINS: http://localhost:13337
+      MEDIA_ROOT: /media
+      IMAGE_ROOT: /images
+    depends_on:
+      - db
+    ports:
+      - "13338:8000"
+    volumes:
+      - ./sample_media:/media:ro
+      - ./image_seed:/images:ro
+
+  web:
+    image: indexxxer-web:0.3.0
+    build:
+      context: ./frontend
+      args:
+        CACHEBUST: "1765744000"
+    environment:
+      NEXT_PUBLIC_APP_NAME: indexxxer
+      NEXT_PUBLIC_APP_VERSION: "0.3.0"
+      API_INTERNAL_BASE: http://api:8000
+    depends_on:
+      - api
+    ports:
+      - "13337:3000"
+
+volumes:
+  pgdata:
