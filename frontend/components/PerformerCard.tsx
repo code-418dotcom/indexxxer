@@ -187,100 +187,177 @@ export default function PerformerCard({
         flexShrink: 0,
       };
 
-  const cardContent = (
-    <div
-      style={{
-        border: "1px solid rgba(0,0,0,0.1)",
-        borderRadius: 16,
-        padding: 16,
-        boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-        background: "white",
-      }}
-    >
-      <div style={{ display: "flex", gap: 16, alignItems: isDetail ? "flex-start" : "stretch" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: isDetail ? 10 : 0, alignItems: isDetail ? "stretch" : "initial" }}>
-          <div
-            role={isDetail ? "img" : "button"}
-            onClick={(e) => {
-              if (isDetail) return;
-              e.preventDefault();
-              e.stopPropagation();
-              if (imgOk) {
-                setModalSrc(fullSrc);
-                setOpen(true);
-              }
-            }}
-            title={isDetail ? "" : imgOk ? "Open image" : "No image"}
-            style={{
-              ...imageBoxStyle,
-              cursor: !isDetail && imgOk ? "zoom-in" : "default",
-            }}
-          >
-            {imgOk ? (
-              <img
-                src={isDetail ? thumbLarge : thumbSmall}
-                alt={p.name}
-                style={{
-                  width: "100%",
-                  height: isDetail ? "auto" : "100%",
-                  objectFit: isDetail ? "contain" : "cover",
-                  display: "block",
-                  background: "rgba(0,0,0,0.02)",
-                }}
-                onError={() => setImgOk(false)}
-              />
-            ) : (
+  return (
+    <>
+      <a
+        href={`/performers/${p.id}`}
+        style={{ display: "block", color: "inherit", textDecoration: "none" }}
+        onClick={(e) => {
+          if (isDetail) e.preventDefault(); // on detail page we don't want nested navigation
+        }}
+      >
+        <div
+          style={{
+            border: "1px solid rgba(0,0,0,0.1)",
+            borderRadius: 16,
+            padding: 16,
+            boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
+            background: "white",
+          }}
+        >
+          <div style={{ display: "flex", gap: 16, alignItems: isDetail ? "flex-start" : "stretch" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: isDetail ? 10 : 0, alignItems: isDetail ? "stretch" : "initial" }}>
               <div
+                role={isDetail ? "img" : "button"}
+                onClick={(e) => {
+                  if (isDetail) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (imgOk) {
+                    setModalSrc(fullSrc);
+                    setOpen(true);
+                  }
+                }}
+                title={isDetail ? "" : imgOk ? "Open image" : "No image"}
                 style={{
-                  width: "100%",
-                  height: isDetail ? 320 : "100%",
-                  display: "grid",
-                  placeItems: "center",
-                  opacity: 0.6,
+                  ...imageBoxStyle,
+                  cursor: !isDetail && imgOk ? "zoom-in" : "default",
                 }}
               >
-                No image
+                {imgOk ? (
+                  <img
+                    src={isDetail ? thumbLarge : thumbSmall}
+                    alt={p.name}
+                    style={{
+                      width: "100%",
+                      height: isDetail ? "auto" : "100%",
+                      objectFit: isDetail ? "contain" : "cover",
+                      display: "block",
+                      background: "rgba(0,0,0,0.02)",
+                    }}
+                    onError={() => setImgOk(false)}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: isDetail ? 320 : "100%",
+                      display: "grid",
+                      placeItems: "center",
+                      opacity: 0.6,
+                    }}
+                  >
+                    No image
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {isDetail && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Change picture</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <input
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="Image URL (https://...)"
-                  style={{
-                    flex: "1 1 220px",
-                    padding: "8px 10px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(0,0,0,0.15)",
-                    outline: "none",
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={uploadBusy}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleImageChange({ url: urlInput });
-                  }}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(0,0,0,0.1)",
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "white",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                  }}
-                >
-                  {uploadBusy ? "Working..." : "Download"}
-                </button>
+              {isDetail && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>Change picture</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input
+                      type="url"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      placeholder="Image URL (https://...)"
+                      style={{
+                        flex: "1 1 220px",
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(0,0,0,0.15)",
+                        outline: "none",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={uploadBusy}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleImageChange({ url: urlInput });
+                      }}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(0,0,0,0.1)",
+                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        color: "white",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {uploadBusy ? "Working..." : "Download"}
+                    </button>
+                  </div>
+
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      border: "1px dashed rgba(0,0,0,0.2)",
+                      cursor: "pointer",
+                      background: "rgba(0,0,0,0.02)",
+                      fontSize: 13,
+                    }}
+                  >
+                    📤 Upload image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        handleImageChange({ file: f });
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {uploadMsg ? (
+                    <div style={{ fontSize: 12, opacity: 0.75 }}>{uploadMsg}</div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 800 }}>{p.name}</div>
+                  {aliases?.length ? (
+                    <div style={{ marginTop: 4, fontSize: 13, opacity: 0.75 }}>
+                      Aliases: {aliases.join(", ")}
+                    </div>
+                  ) : null}
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "nowrap" }}>#{p.id}</div>
+                  {onDelete && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDelete(p.id);
+                      }}
+                      title="Delete performer"
+                      style={{
+                        border: "1px solid rgba(255,0,0,0.2)",
+                        background: "rgba(255,0,0,0.06)",
+                        color: "#b00020",
+                        borderRadius: 10,
+                        padding: "6px 10px",
+                        cursor: "pointer",
+                        fontSize: 12,
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
 
               <label
