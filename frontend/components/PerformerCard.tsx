@@ -33,6 +33,8 @@ export type Performer = {
   // Pre-computed counts returned by the API
   scene_count?: number;
   gallery_count?: number;
+  video_count?: number;
+  image_count?: number;
 };
 
 const FIELD_KEY_MAP: Record<string, string> = {
@@ -130,9 +132,15 @@ export default function PerformerCard({
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const scenes = typeof p.scene_count === "number" ? p.scene_count : undefined;
-  const galleries =
-    typeof p.gallery_count === "number" ? p.gallery_count : undefined;
+  const videos = typeof p.video_count === "number" ? p.video_count : undefined;
+  const images = typeof p.image_count === "number" ? p.image_count : undefined;
+  const galleries = typeof p.gallery_count === "number" ? p.gallery_count : undefined;
+
+  const mediaPills = [
+    { label: "Videos", value: videos, href: "/?kind=video" },
+    { label: "Images", value: images, href: "/?kind=image" },
+    { label: "ZIP galleries", value: galleries, href: "/?kind=zip" },
+  ].filter((m) => m.value !== undefined);
 
   const refreshImage = () => {
     setImgOk(true);
@@ -384,7 +392,7 @@ export default function PerformerCard({
             </div>
           </div>
 
-          {scenes !== undefined || galleries !== undefined ? (
+          {mediaPills.length ? (
             <div
               style={{
                 marginTop: 8,
@@ -393,32 +401,25 @@ export default function PerformerCard({
                 flexWrap: "wrap",
               }}
             >
-              {scenes !== undefined ? (
-                <span
+              {mediaPills.map((pill) => (
+                <a
+                  key={pill.label}
+                  href={pill.href}
+                  title={`Filter performers with ${pill.label.toLowerCase()}`}
                   style={{
                     fontSize: 12,
-                    padding: "3px 8px",
+                    padding: "6px 10px",
                     border: "1px solid rgba(0,0,0,0.12)",
                     borderRadius: 999,
                     opacity: 0.85,
+                    textDecoration: "none",
+                    color: "inherit",
+                    background: "rgba(0,0,0,0.02)",
                   }}
                 >
-                  Scenes: {scenes}
-                </span>
-              ) : null}
-              {galleries !== undefined ? (
-                <span
-                  style={{
-                    fontSize: 12,
-                    padding: "3px 8px",
-                    border: "1px solid rgba(0,0,0,0.12)",
-                    borderRadius: 999,
-                    opacity: 0.85,
-                  }}
-                >
-                  Galleries: {galleries}
-                </span>
-              ) : null}
+                  {pill.label}: {pill.value}
+                </a>
+              ))}
             </div>
           ) : null}
 

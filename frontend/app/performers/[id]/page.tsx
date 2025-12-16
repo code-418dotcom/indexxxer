@@ -41,7 +41,7 @@ export default function PerformerDetail({ params }: { params: { id: string } }) 
           setLinkedMedia(Array.isArray(linked) ? linked : []);
         }
 
-        const itemsRes = await fetch(`/api/media/items?limit=500&offset=0`, { cache: "no-store" });
+        const itemsRes = await fetch(`/api/media/items?limit=-1&offset=0`, { cache: "no-store" });
         if (itemsRes.ok) {
           const raw = await itemsRes.json();
           if (cancelled) return;
