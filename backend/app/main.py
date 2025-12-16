@@ -855,22 +855,69 @@ def media_thumb(rel_path: str = Query(..., description="Relative path within MED
 
     if kind == "video":
         # generate a frame at ~1s (or first frame) scaled to 480 width
-        subprocess.run(
-            ["ffmpeg", "-y", "-ss", "00:00:01", "-i", str(p), "-frames:v", "1", "-vf", "scale='min(480,iw)':-2", "-q:v", "4", str(out)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        if not out.exists():
-            # fallback: try first frame without -ss
+        attempts = [
+            ["-ss", "00:00:30"],  # prefer a representative frame 30s in
+            ["-ss", "00:00:01"],  # fallback to early frame
+            [],  # final fallback: first frame
+        ]
+
+        for seek in attempts:
+            if out.exists():
+                break
             subprocess.run(
-                ["ffmpeg", "-y", "-i", str(p), "-frames:v", "1", "-vf", "scale='min(480,iw)':-2", "-q:v", "4", str(out)],
+                [
+                    "ffmpeg",
+                    "-y",
+                    *seek,
+                    "-i",
+                    str(p),
+                    "-frames:v",
+                    "1",
+                    "-vf",
+                    "scale='min(480,iw)':-2",
+                    "-q:v",
+                    "4",
+                    str(out),
+                ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 check=False,
             )
         if not out.exists():
             raise HTTPException(500, "Failed to generate thumbnail (ffmpeg unavailable?)")
+        return FileResponse(str(out), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=300"})
+
+    if kind == "zip":
+        entries = _zip_list_images(p)
+        if not entries:
+            raise HTTPException(404, "No images found in zip")
+
+        entry = entries[0]
+        size = 480
+        key = _zip_cache_key(rel_path, entry, size=size)
+        out = ZIP_CACHE / "thumbs" / f"{key}.jpg"
+
+        if out.exists() and out.is_file():
+            return FileResponse(str(out), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=300"})
+
+        tmp = ZIP_CACHE / "tmp" / f"{key}{Path(entry).suffix.lower() or '.bin'}"
+        _zip_extract_to_tmp(p, entry, tmp)
+
+        try:
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", str(tmp), "-vf", f"scale='min({size},iw)':-2", "-q:v", "4", str(out)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+        except Exception:
+            pass
+
+        if not out.exists():
+            # fallback: serve the extracted original entry
+            mime, _ = mimetypes.guess_type(entry)
+            return FileResponse(str(tmp), media_type=mime or "application/octet-stream", headers={"Cache-Control": "public, max-age=60"})
+
         return FileResponse(str(out), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=300"})
 
     raise HTTPException(415, "No thumbnail for this file type")
