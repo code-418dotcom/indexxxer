@@ -27,10 +27,11 @@ MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/media")).resolve()
 IMAGE_ROOT = Path(os.getenv("IMAGE_ROOT", "/images")).resolve()
 # A writable location for newly uploaded performer images. If IMAGE_ROOT isn't writable,
 # fall back to a cache directory so uploads still succeed in read-only environments.
-UPLOAD_IMAGE_ROOT = IMAGE_ROOT
+UPLOAD_IMAGE_ROOT = Path(os.getenv("UPLOAD_IMAGE_ROOT", IMAGE_ROOT)).resolve()
 THUMB_CACHE = Path(os.getenv("THUMB_CACHE", "/app/cache/thumbs")).resolve()
 ZIP_CACHE = THUMB_CACHE / "zip"
 PERFORMER_THUMB_DIR = THUMB_CACHE / "performers"
+UPLOAD_CACHE_DIR = THUMB_CACHE / "uploads"
 
 app = FastAPI(title=f"{APP_NAME} API", version=APP_VERSION)
 
@@ -49,6 +50,21 @@ def startup():
     ZIP_CACHE.mkdir(parents=True, exist_ok=True)
     PERFORMER_THUMB_DIR.mkdir(parents=True, exist_ok=True)
     IMAGE_ROOT.mkdir(parents=True, exist_ok=True)
+
+    # Select a writable upload root. If the preferred root is read-only, fall back
+    # to a cache directory so uploads can still succeed.
+    global UPLOAD_IMAGE_ROOT
+    for root in (UPLOAD_IMAGE_ROOT, UPLOAD_CACHE_DIR):
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            tmp = root / ".write_test"
+            tmp.touch(exist_ok=False)
+            tmp.unlink(missing_ok=True)
+            UPLOAD_IMAGE_ROOT = root
+            break
+        except Exception:
+            continue
+
     # Ensure a default media selection exists
     with next(get_db()) as db:
         sel = db.get(AppSetting, "media_selected_path")
@@ -349,7 +365,11 @@ async def set_performer_image(
         target = _image_target_path(p)
         # Clear previous variants for this performer
         for cand in _candidate_image_paths(p.name):
-            cand.unlink(missing_ok=True)
+            try:
+                cand.unlink(missing_ok=True)
+            except Exception:
+                # Read-only roots may be present for existing images; ignore failures
+                pass
 
         if not _save_resized_image(src, target):
             raise HTTPException(500, "Failed to process image")
