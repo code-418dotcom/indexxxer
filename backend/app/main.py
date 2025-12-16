@@ -683,17 +683,12 @@ async def media_index(db: Session = Depends(get_db)):
         performers = db.execute(select(Performer)).scalars().all()
         media_items = db.execute(select(MediaItem)).scalars().all()
 
-        matches_created = 0
-
-        for p_idx, performer in enumerate(performers):
-            if (p_idx + 1) % 10 == 0:
-                yield send_progress(f"Matching performer {p_idx + 1}/{len(performers)}...", {
-                    "phase": "matching",
-                    "performer": p_idx + 1,
-                    "total_performers": len(performers),
-                    "matches": matches_created
-                })
-
+        # Build a lookup of normalized performer names/aliases so we can match
+        # paths without repeatedly scanning every performer. Keys are compact,
+        # whitespace-free strings (e.g. "firstname.lastname" becomes
+        # "firstnamelastname").
+        key_to_performers: dict[str, list[Performer]] = {}
+        for performer in performers:
             keys = []
             if performer.name:
                 keys.append(_norm_compact(performer.name))
@@ -703,31 +698,69 @@ async def media_index(db: Session = Depends(get_db)):
                     if a:
                         keys.append(_norm_compact(a))
 
-            if not keys:
+            for key in keys:
+                key_to_performers.setdefault(key, []).append(performer)
+
+        matches_created = 0
+        seen_links: set[tuple[int, int]] = set()
+
+        for idx, item in enumerate(media_items):
+            if (idx + 1) % 50 == 0:
+                yield send_progress(
+                    f"Matching media item {idx + 1}/{len(media_items)}...",
+                    {
+                        "phase": "matching",
+                        "matches": matches_created,
+                        "media_item": idx + 1,
+                        "total_media": len(media_items),
+                    },
+                )
+
+            rel_path = Path(item.rel_path)
+            rel_norm = _norm_compact(item.rel_path)
+
+            # First try exact directory matches (e.g. media/Firstname Lastname/file.mp4)
+            folder_matched = False
+            dir_keys = {_norm_compact(part) for part in rel_path.parts[:-1]}
+            for dir_key in dir_keys:
+                for performer in key_to_performers.get(dir_key, []):
+                    link_key = (performer.id, item.id)
+                    if link_key in seen_links:
+                        continue
+                    db.add(
+                        PerformerMedia(
+                            performer_id=performer.id,
+                            media_item_id=item.id,
+                            confidence=1.0,
+                            matched_by="folder",
+                        )
+                    )
+                    seen_links.add(link_key)
+                    matches_created += 1
+                    folder_matched = True
+
+            # Fallback to filename matches when no folder match was found.
+            # This keeps compatibility with previous behavior while avoiding
+            # quadratic performer/media scans.
+            if folder_matched:
                 continue
 
-            for item in media_items:
-                rel_norm = _norm_compact(item.rel_path)
-                matched = False
-                match_type = "filename"
-                confidence = 0.0
-
-                for key in keys:
-                    if key in rel_norm:
-                        matched = True
-                        conf = len(key) / max(len(rel_norm), 1)
-                        if conf > confidence:
-                            confidence = conf
-
-                if matched:
-                    link = PerformerMedia(
+            filename_key = _norm_compact(rel_path.stem)
+            for performer in key_to_performers.get(filename_key, []):
+                link_key = (performer.id, item.id)
+                if link_key in seen_links:
+                    continue
+                rel_len = max(len(rel_norm), 1)
+                db.add(
+                    PerformerMedia(
                         performer_id=performer.id,
                         media_item_id=item.id,
-                        confidence=confidence,
-                        matched_by=match_type
+                        confidence=len(filename_key) / rel_len,
+                        matched_by="filename",
                     )
-                    db.add(link)
-                    matches_created += 1
+                )
+                seen_links.add(link_key)
+                matches_created += 1
 
         db.commit()
 
