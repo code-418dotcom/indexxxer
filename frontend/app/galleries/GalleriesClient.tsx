@@ -19,6 +19,7 @@ export default function GalleriesClient() {
   const [entries, setEntries] = useState<string[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
   const [err, setErr] = useState<string>("");
+  const [thumbErrors, setThumbErrors] = useState<Record<string, boolean>>({});
 
   const [open, setOpen] = useState(false);
   const [openSrc, setOpenSrc] = useState("");
@@ -201,7 +202,30 @@ export default function GalleriesClient() {
                   e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04)";
                 }}
               >
-                <div style={{ fontSize: 32, marginBottom: 12 }}>📁</div>
+                <div
+                  style={{
+                    position: "relative",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    marginBottom: 12,
+                    height: 180,
+                    background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  {thumbErrors[z.rel_path] ? (
+                    <div style={{ fontSize: 32, opacity: 0.7 }}>📁</div>
+                  ) : (
+                    <img
+                      src={`/api/media/thumb?rel_path=${encodeURIComponent(z.rel_path)}`}
+                      alt={basename(z.rel_path)}
+                      loading="lazy"
+                      onError={() => setThumbErrors((prev) => ({ ...prev, [z.rel_path]: true }))}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  )}
+                </div>
                 <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: "#1f2937", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={z.rel_path}>
                   {basename(z.rel_path)}
                 </div>
