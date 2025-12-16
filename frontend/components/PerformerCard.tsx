@@ -187,26 +187,18 @@ export default function PerformerCard({
         flexShrink: 0,
       };
 
-  return (
-    <>
-      <a
-        href={`/performers/${p.id}`}
-        style={{ display: "block", color: "inherit", textDecoration: "none" }}
-        onClick={(e) => {
-          if (isDetail) e.preventDefault(); // on detail page we don't want nested navigation
-        }}
-      >
-        <div
-          style={{
-            border: "1px solid rgba(0,0,0,0.1)",
-            borderRadius: 16,
-            padding: 16,
-            boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
-            background: "white",
-          }}
-        >
-          <div style={{ display: "flex", gap: 16, alignItems: isDetail ? "flex-start" : "stretch" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: isDetail ? 10 : 0, alignItems: isDetail ? "stretch" : "initial" }}>
+  const cardContent = (
+    <div
+      style={{
+        border: "1px solid rgba(0,0,0,0.1)",
+        borderRadius: 16,
+        padding: 16,
+        boxShadow: "0 6px 18px rgba(0,0,0,0.06)",
+        background: "white",
+      }}
+    >
+      <div style={{ display: "flex", gap: 16, alignItems: isDetail ? "flex-start" : "stretch" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: isDetail ? 10 : 0, alignItems: isDetail ? "stretch" : "initial" }}>
               <div
                 role={isDetail ? "img" : "button"}
                 onClick={(e) => {
@@ -498,6 +490,9 @@ export default function PerformerCard({
         <a
           href={`/performers/${p.id}`}
           style={{ display: "block", color: "inherit", textDecoration: "none" }}
+          onClick={(e) => {
+            if (isDetail) e.preventDefault();
+          }}
         >
           {cardContent}
         </a>
