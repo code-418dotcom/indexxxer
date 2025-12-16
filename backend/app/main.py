@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, delete
+from pydantic import BaseModel
 
 from .db import Base, engine, get_db
 from .models import Performer, AppSetting, MediaItem, PerformerMedia
@@ -64,6 +65,14 @@ def _clear_dir(path: Path) -> None:
 def _clear_thumb_caches() -> None:
     _clear_dir(ZIP_CACHE)
     _clear_dir(PERFORMER_THUMB_DIR)
+
+
+def _clear_performer_thumbs(performer_id: int) -> None:
+    try:
+        for f in PERFORMER_THUMB_DIR.glob(f"{performer_id}_*.jpg"):
+            f.unlink(missing_ok=True)
+    except Exception:
+        pass
 
 def _slug_first_last(name: str) -> str:
     parts = [p for p in re.split(r"\s+", (name or "").strip()) if p]
@@ -145,6 +154,57 @@ def list_performers(db: Session = Depends(get_db)):
         out.append(d)
     return out
 
+
+class PerformerPayload(BaseModel):
+    name: str
+    aliases: str | None = None
+    date_of_birth: str | None = None
+    age: int | None = None
+    career_status: str | None = None
+    career_start: str | None = None
+    career_end: str | None = None
+    date_of_death: str | None = None
+    place_of_birth: str | None = None
+    ethnicity: str | None = None
+    boobs: str | None = None
+    bust: int | None = None
+    cup: str | None = None
+    bra: str | None = None
+    waist: int | None = None
+    hip: int | None = None
+    butt: str | None = None
+    height: int | None = None
+    weight: int | None = None
+    hair_color: str | None = None
+    eye_color: str | None = None
+    piercings: bool | None = None
+    piercing_locations: str | None = None
+    tattoos: bool | None = None
+    tattoo_locations: str | None = None
+
+
+@app.post("/performers")
+def create_performer(payload: PerformerPayload, db: Session = Depends(get_db)):
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(400, "Name is required")
+
+    existing = db.execute(select(Performer).where(Performer.name == name)).scalar_one_or_none()
+    if existing:
+        raise HTTPException(409, "Performer already exists")
+
+    p = Performer(**payload.model_dump())
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+
+    d = p.__dict__.copy()
+    d.pop("_sa_instance_state", None)
+    d["scene_count"] = 0
+    d["gallery_count"] = 0
+    return d
+
+
 @app.get("/performers/{performer_id}")
 def get_performer(performer_id: int, db: Session = Depends(get_db)):
     p = db.get(Performer, performer_id)
@@ -153,6 +213,18 @@ def get_performer(performer_id: int, db: Session = Depends(get_db)):
     d = p.__dict__.copy()
     d.pop("_sa_instance_state", None)
     return d
+
+
+@app.delete("/performers/{performer_id}")
+def delete_performer(performer_id: int, db: Session = Depends(get_db)):
+    p = db.get(Performer, performer_id)
+    if not p:
+        raise HTTPException(404, "Performer not found")
+
+    _clear_performer_thumbs(performer_id)
+    db.delete(p)
+    db.commit()
+    return {"status": "deleted", "id": performer_id}
 
 
 @app.get("/performers/{performer_id}/media")
@@ -194,6 +266,12 @@ def get_performer_image(performer_id: int, db: Session = Depends(get_db)):
     if not p:
         raise HTTPException(404, "Performer not found")
 
+    for cand in _candidate_image_paths(p.name):
+        if cand.exists() and cand.is_file():
+            return FileResponse(str(cand), headers={"Cache-Control": "public, max-age=300"})
+
+    raise HTTPException(404, "Image not found")
+
 
 @app.get("/performers/{performer_id}/thumb")
 def get_performer_thumb(performer_id: int, size: int = 480, db: Session = Depends(get_db)):
@@ -233,12 +311,6 @@ def get_performer_thumb(performer_id: int, size: int = 480, db: Session = Depend
         return FileResponse(str(src), headers={"Cache-Control": "public, max-age=60"})
 
     return FileResponse(str(out), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=300"})
-
-    for cand in _candidate_image_paths(p.name):
-        if cand.exists() and cand.is_file():
-            return FileResponse(str(cand), headers={"Cache-Control": "public, max-age=300"})
-
-    raise HTTPException(404, "Image not found")
 
 @app.post("/performers/import-csv")
 async def import_performers_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):

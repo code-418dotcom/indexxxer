@@ -24,6 +24,10 @@ export default function Page() {
   const [fieldFilter, setFieldFilter] = useState<{ key: string; value: string } | null>(null);
   const [pageSize, setPageSize] = useState<number>(25);
   const [page, setPage] = useState<number>(1);
+  const [newName, setNewName] = useState<string>("");
+  const [newAliases, setNewAliases] = useState<string>("");
+  const [busy, setBusy] = useState<boolean>(false);
+  const [saveMsg, setSaveMsg] = useState<string>("");
 
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "indexxxer";
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "0.0.0";
@@ -306,7 +310,80 @@ const filtered = useMemo(() => {
 </div>
 
 
-<div style={{ marginTop: 20, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
+          <div style={{ marginTop: 20, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
+            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13, opacity: 0.7 }}>Add performer</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Name"
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  outline: "none",
+                }}
+              />
+              <input
+                value={newAliases}
+                onChange={(e) => setNewAliases(e.target.value)}
+                placeholder="Aliases (optional)"
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={async () => {
+                  const trimmed = newName.trim();
+                  setSaveMsg("");
+                  if (!trimmed) {
+                    setSaveMsg("Name is required");
+                    return;
+                  }
+                  try {
+                    setBusy(true);
+                    const res = await fetch(`/api/performers`, {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ name: trimmed, aliases: newAliases.trim() || undefined }),
+                    });
+                    const text = await res.text();
+                    if (!res.ok) {
+                      setSaveMsg(text || `Failed to add performer (${res.status})`);
+                      return;
+                    }
+                    const created = JSON.parse(text);
+                    setPerformers((prev) => [...prev, created].sort((a, b) => String(a.name).localeCompare(String(b.name))));
+                    setNewName("");
+                    setNewAliases("");
+                    setSaveMsg("Saved");
+                  } catch (e: any) {
+                    setSaveMsg(e?.message || String(e));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+                disabled={busy}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: busy ? "rgba(0,0,0,0.08)" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  color: busy ? "rgba(0,0,0,0.5)" : "white",
+                  cursor: busy ? "wait" : "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                {busy ? "Saving…" : "Add performer"}
+              </button>
+              {saveMsg && <div style={{ fontSize: 12, color: "#b00020" }}>{saveMsg}</div>}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 20, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13, opacity: 0.7 }}>Filters</div>
           <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 12 }}>
             Click any tag to filter
@@ -482,7 +559,24 @@ const filtered = useMemo(() => {
             }}
           >
             {paged.map((p) => (
-              <PerformerCard key={p.id} p={p} />
+              <PerformerCard
+                key={p.id}
+                p={p}
+                onDelete={async (id) => {
+                  if (!confirm("Delete this performer?")) return;
+                  try {
+                    const res = await fetch(`/api/performers/${id}`, { method: "DELETE" });
+                    const text = await res.text();
+                    if (!res.ok) {
+                      alert(text || `Failed to delete (${res.status})`);
+                      return;
+                    }
+                    setPerformers((prev) => prev.filter((x) => x.id !== id));
+                  } catch (e: any) {
+                    alert(e?.message || String(e));
+                  }
+                }}
+              />
             ))}
           </div>
 
