@@ -17,3 +17,19 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     },
   });
 }
+
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const apiBase = process.env.API_INTERNAL_BASE || "http://api:8000";
+  const body = await req.formData();
+
+  const res = await fetch(`${apiBase}/performers/${params.id}/image`, {
+    method: "POST",
+    body,
+  });
+
+  const text = await res.text();
+  return new NextResponse(text, {
+    status: res.status,
+    headers: { "content-type": res.headers.get("content-type") || "application/json" },
+  });
+}
