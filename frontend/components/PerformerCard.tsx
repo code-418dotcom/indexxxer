@@ -116,14 +116,55 @@ export default function PerformerCard({
   const [imgOk, setImgOk] = React.useState(true);
   const [open, setOpen] = React.useState(false);
   const [modalSrc, setModalSrc] = React.useState<string>("");
+  const [imgVersion, setImgVersion] = React.useState<number>(() => Date.now());
+  const [uploadBusy, setUploadBusy] = React.useState(false);
+  const [uploadMsg, setUploadMsg] = React.useState<string>("");
+  const [urlInput, setUrlInput] = React.useState<string>("");
 
-  const fullSrc = `/api/performers/${p.id}/image`;
-  const thumbSmall = `/api/performers/${p.id}/thumb?size=480`;
-  const thumbLarge = `/api/performers/${p.id}/thumb?size=1200`;
+  const fullSrc = `/api/performers/${p.id}/image?v=${imgVersion}`;
+  const thumbSmall = `/api/performers/${p.id}/thumb?size=480&v=${imgVersion}`;
+  const thumbLarge = `/api/performers/${p.id}/thumb?size=1200&v=${imgVersion}`;
   const aliases = p.aliases?.split("|").map((s) => s.trim()).filter(Boolean);
 
   const scenes = typeof p.scene_count === "number" ? p.scene_count : undefined;
   const galleries = typeof p.gallery_count === "number" ? p.gallery_count : undefined;
+
+  const refreshImage = () => {
+    setImgOk(true);
+    setImgVersion(Date.now());
+  };
+
+  const handleImageChange = async ({ file, url }: { file?: File; url?: string }) => {
+    setUploadMsg("");
+    if (!file && !url) {
+      setUploadMsg("Provide an image upload or URL");
+      return;
+    }
+
+    const form = new FormData();
+    if (file) form.append("file", file);
+    if (url?.trim()) form.append("url", url.trim());
+
+    setUploadBusy(true);
+    try {
+      const res = await fetch(`/api/performers/${p.id}/image`, {
+        method: "POST",
+        body: form,
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        setUploadMsg(text || `Update failed (${res.status})`);
+        return;
+      }
+      setUploadMsg("Image updated");
+      setUrlInput("");
+      refreshImage();
+    } catch (e: any) {
+      setUploadMsg(e?.message || "Failed to update image");
+    } finally {
+      setUploadBusy(false);
+    }
+  };
 
   const isDetail = variant === "detail";
 
@@ -163,47 +204,120 @@ export default function PerformerCard({
           }}
         >
           <div style={{ display: "flex", gap: 16, alignItems: isDetail ? "flex-start" : "stretch" }}>
-            <div
-              role={isDetail ? "img" : "button"}
-              onClick={(e) => {
-                if (isDetail) return;
-                e.preventDefault();
-                e.stopPropagation();
-                if (imgOk) {
-                  setModalSrc(fullSrc);
-                  setOpen(true);
-                }
-              }}
-              title={isDetail ? "" : imgOk ? "Open image" : "No image"}
-              style={{
-                ...imageBoxStyle,
-                cursor: !isDetail && imgOk ? "zoom-in" : "default",
-              }}
-            >
-              {imgOk ? (
-                <img
-                  src={isDetail ? thumbLarge : thumbSmall}
-                  alt={p.name}
-                  style={{
-                    width: "100%",
-                    height: isDetail ? "auto" : "100%",
-                    objectFit: isDetail ? "contain" : "cover",
-                    display: "block",
-                    background: "rgba(0,0,0,0.02)",
-                  }}
-                  onError={() => setImgOk(false)}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: "100%",
-                    height: isDetail ? 320 : "100%",
-                    display: "grid",
-                    placeItems: "center",
-                    opacity: 0.6,
-                  }}
-                >
-                  No image
+            <div style={{ display: "flex", flexDirection: "column", gap: isDetail ? 10 : 0, alignItems: isDetail ? "stretch" : "initial" }}>
+              <div
+                role={isDetail ? "img" : "button"}
+                onClick={(e) => {
+                  if (isDetail) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (imgOk) {
+                    setModalSrc(fullSrc);
+                    setOpen(true);
+                  }
+                }}
+                title={isDetail ? "" : imgOk ? "Open image" : "No image"}
+                style={{
+                  ...imageBoxStyle,
+                  cursor: !isDetail && imgOk ? "zoom-in" : "default",
+                }}
+              >
+                {imgOk ? (
+                  <img
+                    src={isDetail ? thumbLarge : thumbSmall}
+                    alt={p.name}
+                    style={{
+                      width: "100%",
+                      height: isDetail ? "auto" : "100%",
+                      objectFit: isDetail ? "contain" : "cover",
+                      display: "block",
+                      background: "rgba(0,0,0,0.02)",
+                    }}
+                    onError={() => setImgOk(false)}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: isDetail ? 320 : "100%",
+                      display: "grid",
+                      placeItems: "center",
+                      opacity: 0.6,
+                    }}
+                  >
+                    No image
+                  </div>
+                )}
+              </div>
+
+              {isDetail && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>Change picture</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <input
+                      type="url"
+                      value={urlInput}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                      placeholder="Image URL (https://...)"
+                      style={{
+                        flex: "1 1 220px",
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(0,0,0,0.15)",
+                        outline: "none",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={uploadBusy}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleImageChange({ url: urlInput });
+                      }}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(0,0,0,0.1)",
+                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        color: "white",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {uploadBusy ? "Working..." : "Download"}
+                    </button>
+                  </div>
+
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      border: "1px dashed rgba(0,0,0,0.2)",
+                      cursor: "pointer",
+                      background: "rgba(0,0,0,0.02)",
+                      fontSize: 13,
+                    }}
+                  >
+                    📤 Upload image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        handleImageChange({ file: f });
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {uploadMsg ? (
+                    <div style={{ fontSize: 12, opacity: 0.75 }}>{uploadMsg}</div>
+                  ) : null}
                 </div>
               )}
             </div>
