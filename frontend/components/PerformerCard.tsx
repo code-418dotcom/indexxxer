@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 
 export type Performer = {
@@ -358,66 +360,148 @@ export default function PerformerCard({
                 </div>
               </div>
 
-              {(scenes !== undefined || galleries !== undefined) ? (
-                <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {scenes !== undefined ? (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        padding: "3px 8px",
-                        border: "1px solid rgba(0,0,0,0.12)",
-                        borderRadius: 999,
-                        opacity: 0.85,
-                      }}
-                    >
-                      Scenes: {scenes}
-                    </span>
-                  ) : null}
-                  {galleries !== undefined ? (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        padding: "3px 8px",
-                        border: "1px solid rgba(0,0,0,0.12)",
-                        borderRadius: 999,
-                        opacity: 0.85,
-                      }}
-                    >
-                      Galleries: {galleries}
-                    </span>
-                  ) : null}
+              <label
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  border: "1px dashed rgba(0,0,0,0.2)",
+                  cursor: "pointer",
+                  background: "rgba(0,0,0,0.02)",
+                  fontSize: 13,
+                }}
+              >
+                📤 Upload image
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    handleImageChange({ file: f });
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {uploadMsg ? (
+                <div style={{ fontSize: 12, opacity: 0.75 }}>{uploadMsg}</div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 20, fontWeight: 800 }}>{p.name}</div>
+              {aliases?.length ? (
+                <div style={{ marginTop: 4, fontSize: 13, opacity: 0.75 }}>
+                  Aliases: {aliases.join(", ")}
                 </div>
               ) : null}
-
-              <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
-                <Row k="Date of birth" v={p.date_of_birth} />
-                <Row k="Age" v={p.age} />
-                <Row k="Career status" v={p.career_status} />
-                <Row k="Career start" v={p.career_start} />
-                <Row k="Career end" v={p.career_end} />
-                <Row k="Place of birth" v={p.place_of_birth} />
-                <Row k="Ethnicity" v={p.ethnicity} />
-                <Row k="Boobs" v={p.boobs} />
-                <Row k="Bust" v={p.bust} />
-                <Row k="Cup" v={p.cup} />
-                <Row k="Bra" v={p.bra} />
-                <Row k="Waist" v={p.waist} />
-                <Row k="Hip" v={p.hip} />
-                <Row k="Butt" v={p.butt} />
-                <Row k="Height" v={p.height} />
-                <Row k="Weight" v={p.weight} />
-                <Row k="Hair Color" v={p.hair_color} />
-                <Row k="Eye Color" v={p.eye_color} />
-                <Row k="Piercings" v={p.piercings} />
-                <Row k="Piercing locations" v={p.piercing_locations} />
-                <Row k="Tattoos" v={p.tattoos} />
-                <Row k="Tattoo locations" v={p.tattoo_locations} />
-                <Row k="Date of death" v={p.date_of_death} />
-              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "nowrap" }}>#{p.id}</div>
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDelete(p.id);
+                  }}
+                  title="Delete performer"
+                  style={{
+                    border: "1px solid rgba(255,0,0,0.2)",
+                    background: "rgba(255,0,0,0.06)",
+                    color: "#b00020",
+                    borderRadius: 10,
+                    padding: "6px 10px",
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  Delete
+                </button>
+              )}
             </div>
           </div>
+
+          {(scenes !== undefined || galleries !== undefined) ? (
+            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {scenes !== undefined ? (
+                <span
+                  style={{
+                    fontSize: 12,
+                    padding: "3px 8px",
+                    border: "1px solid rgba(0,0,0,0.12)",
+                    borderRadius: 999,
+                    opacity: 0.85,
+                  }}
+                >
+                  Scenes: {scenes}
+                </span>
+              ) : null}
+              {galleries !== undefined ? (
+                <span
+                  style={{
+                    fontSize: 12,
+                    padding: "3px 8px",
+                    border: "1px solid rgba(0,0,0,0.12)",
+                    borderRadius: 999,
+                    opacity: 0.85,
+                  }}
+                >
+                  Galleries: {galleries}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+            <Row k="Date of birth" v={p.date_of_birth} />
+            <Row k="Age" v={p.age} />
+            <Row k="Career status" v={p.career_status} />
+            <Row k="Career start" v={p.career_start} />
+            <Row k="Career end" v={p.career_end} />
+            <Row k="Place of birth" v={p.place_of_birth} />
+            <Row k="Ethnicity" v={p.ethnicity} />
+            <Row k="Boobs" v={p.boobs} />
+            <Row k="Bust" v={p.bust} />
+            <Row k="Cup" v={p.cup} />
+            <Row k="Bra" v={p.bra} />
+            <Row k="Waist" v={p.waist} />
+            <Row k="Hip" v={p.hip} />
+            <Row k="Butt" v={p.butt} />
+            <Row k="Height" v={p.height} />
+            <Row k="Weight" v={p.weight} />
+            <Row k="Hair Color" v={p.hair_color} />
+            <Row k="Eye Color" v={p.eye_color} />
+            <Row k="Piercings" v={p.piercings} />
+            <Row k="Piercing locations" v={p.piercing_locations} />
+            <Row k="Tattoos" v={p.tattoos} />
+            <Row k="Tattoo locations" v={p.tattoo_locations} />
+            <Row k="Date of death" v={p.date_of_death} />
+          </div>
         </div>
-      </a>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {isDetail ? (
+        cardContent
+      ) : (
+        <a
+          href={`/performers/${p.id}`}
+          style={{ display: "block", color: "inherit", textDecoration: "none" }}
+        >
+          {cardContent}
+        </a>
+      )}
 
       {/* Modal only used in grid view */}
       {open ? (
