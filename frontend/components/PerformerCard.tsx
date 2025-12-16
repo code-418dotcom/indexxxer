@@ -107,9 +107,11 @@ type Variant = "grid" | "detail";
 export default function PerformerCard({
   p,
   variant = "grid",
+  onDelete,
 }: {
   p: Performer;
   variant?: Variant;
+  onDelete?: (id: number) => void;
 }) {
   const [imgOk, setImgOk] = React.useState(true);
   const [open, setOpen] = React.useState(false);
@@ -207,7 +209,7 @@ export default function PerformerCard({
             </div>
 
             <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                 <div>
                   <div style={{ fontSize: 20, fontWeight: 800 }}>{p.name}</div>
                   {aliases?.length ? (
@@ -216,7 +218,30 @@ export default function PerformerCard({
                     </div>
                   ) : null}
                 </div>
-                <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "nowrap" }}>#{p.id}</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <div style={{ fontSize: 12, opacity: 0.6, whiteSpace: "nowrap" }}>#{p.id}</div>
+                  {onDelete && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onDelete(p.id);
+                      }}
+                      title="Delete performer"
+                      style={{
+                        border: "1px solid rgba(255,0,0,0.2)",
+                        background: "rgba(255,0,0,0.06)",
+                        color: "#b00020",
+                        borderRadius: 10,
+                        padding: "6px 10px",
+                        cursor: "pointer",
+                        fontSize: 12,
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
 
               {(scenes !== undefined || galleries !== undefined) ? (
