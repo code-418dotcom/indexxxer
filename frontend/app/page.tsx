@@ -225,7 +225,7 @@ const filtered = useMemo(() => {
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto", background: "linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%)", minHeight: "100vh" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, marginBottom: 24 }}>
+      <header className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16, marginBottom: 24 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 32, background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{appName}</h1>
           <div style={{ fontSize: 13, opacity: 0.5, marginTop: 4 }}>v{appVersion}</div>
@@ -250,7 +250,7 @@ const filtered = useMemo(() => {
         </div>
       ) : null}
 
-      <div style={{ marginTop: 0, display: "grid", gridTemplateColumns: "300px 1fr", gap: 20, alignItems: "start" }}>
+      <div className="layout-grid" style={{ marginTop: 0, display: "grid", gridTemplateColumns: "320px 1fr", gap: 20, alignItems: "start" }}>
         {/* Sidebar */}
         <aside
           style={{
@@ -295,36 +295,45 @@ const filtered = useMemo(() => {
 
 
           <div style={{ marginTop: 20, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
-  <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13, opacity: 0.7 }}>Galleries</div>
-  <a
-    href="/galleries"
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "10px 14px",
-      border: "1px solid rgba(0,0,0,0.1)",
-      borderRadius: 10,
-      textDecoration: "none",
-      fontWeight: 500,
-      fontSize: 14,
-      color: "#667eea",
-      background: "rgba(102, 126, 234, 0.05)",
-      transition: "all 0.2s",
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.background = "rgba(102, 126, 234, 0.1)";
-      e.currentTarget.style.transform = "translateX(2px)";
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.background = "rgba(102, 126, 234, 0.05)";
-      e.currentTarget.style.transform = "translateX(0)";
-    }}
-  >
-    <span>📁</span>
-    <span>Browse ZIP galleries</span>
-  </a>
-</div>
+            <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 13, opacity: 0.7 }}>Browse</div>
+            <div style={{ display: "grid", gap: 8 }}>
+              {[
+                { href: "/galleries", label: "Browse ZIP galleries", icon: "📁" },
+                { href: "/folders", label: "All performer folders", icon: "🗂" },
+                { href: "/videos", label: "All indexed videos", icon: "🎞️" },
+              ].map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 14px",
+                    border: "1px solid rgba(0,0,0,0.1)",
+                    borderRadius: 10,
+                    textDecoration: "none",
+                    fontWeight: 500,
+                    fontSize: 14,
+                    color: "#667eea",
+                    background: "rgba(102, 126, 234, 0.05)",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(102, 126, 234, 0.1)";
+                    e.currentTarget.style.transform = "translateX(2px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(102, 126, 234, 0.05)";
+                    e.currentTarget.style.transform = "translateX(0)";
+                  }}
+                >
+                  <span>{link.icon}</span>
+                  <span>{link.label}</span>
+                </a>
+              ))}
+            </div>
+          </div>
 
 
           <div style={{ marginTop: 20, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
@@ -601,7 +610,7 @@ const filtered = useMemo(() => {
             style={{
               marginTop: 14,
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
               gap: 16,
             }}
           >
@@ -632,6 +641,23 @@ const filtered = useMemo(() => {
           </div>
         </section>
       </div>
+      <style jsx global>{`
+        @media (max-width: 980px) {
+          .layout-grid {
+            grid-template-columns: 1fr;
+          }
+          aside {
+            position: static !important;
+            max-height: none !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+        }
+      `}</style>
     </main>
   );
 }
