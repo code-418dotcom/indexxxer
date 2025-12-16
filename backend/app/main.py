@@ -25,6 +25,9 @@ APP_NAME = os.getenv("APP_NAME", "indexxxer")
 APP_VERSION = os.getenv("APP_VERSION", "0.0.0")
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/media")).resolve()
 IMAGE_ROOT = Path(os.getenv("IMAGE_ROOT", "/images")).resolve()
+# A writable location for newly uploaded performer images. If IMAGE_ROOT isn't writable,
+# fall back to a cache directory so uploads still succeed in read-only environments.
+UPLOAD_IMAGE_ROOT = IMAGE_ROOT
 THUMB_CACHE = Path(os.getenv("THUMB_CACHE", "/app/cache/thumbs")).resolve()
 ZIP_CACHE = THUMB_CACHE / "zip"
 PERFORMER_THUMB_DIR = THUMB_CACHE / "performers"
@@ -92,7 +95,51 @@ def _candidate_image_paths(name: str):
     if not slug:
         return []
     exts = [".jpg", ".jpeg", ".png", ".webp"]
-    return [(IMAGE_ROOT / f"{slug}{ext}") for ext in exts]
+    roots = [IMAGE_ROOT]
+    if UPLOAD_IMAGE_ROOT not in roots:
+        roots.append(UPLOAD_IMAGE_ROOT)
+    return [(root / f"{slug}{ext}") for root in roots for ext in exts]
+
+
+def _image_target_path(performer: Performer) -> Path:
+    slug = _slug_first_last(performer.name)
+    if not slug:
+        slug = f"performer_{performer.id}"
+    return UPLOAD_IMAGE_ROOT / f"{slug}.jpg"
+
+
+def _save_resized_image(src: Path, dest: Path, max_width: int = 960) -> bool:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(".tmp.jpg")
+
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(src),
+                "-vf",
+                f"scale='min({max_width},iw)':-2",
+                "-q:v",
+                "4",
+                str(tmp),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except Exception:
+        return False
+
+    if not tmp.exists():
+        return False
+
+    try:
+        tmp.replace(dest)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return dest.exists()
 
 
 def _image_target_path(performer: Performer) -> Path:
