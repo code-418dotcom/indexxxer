@@ -48,17 +48,7 @@ def startup():
     THUMB_CACHE.mkdir(parents=True, exist_ok=True)
     ZIP_CACHE.mkdir(parents=True, exist_ok=True)
     PERFORMER_THUMB_DIR.mkdir(parents=True, exist_ok=True)
-    global UPLOAD_IMAGE_ROOT
-    try:
-        IMAGE_ROOT.mkdir(parents=True, exist_ok=True)
-        if os.access(IMAGE_ROOT, os.W_OK | os.X_OK):
-            UPLOAD_IMAGE_ROOT = IMAGE_ROOT
-        else:
-            raise PermissionError(f"IMAGE_ROOT not writable: {IMAGE_ROOT}")
-    except Exception:
-        # Fallback to a writable cache path
-        UPLOAD_IMAGE_ROOT = THUMB_CACHE / "uploads"
-        UPLOAD_IMAGE_ROOT.mkdir(parents=True, exist_ok=True)
+    IMAGE_ROOT.mkdir(parents=True, exist_ok=True)
     # Ensure a default media selection exists
     with next(get_db()) as db:
         sel = db.get(AppSetting, "media_selected_path")
@@ -116,6 +106,47 @@ def _image_target_path(performer: Performer) -> Path:
     if not slug:
         slug = f"performer_{performer.id}"
     return UPLOAD_IMAGE_ROOT / f"{slug}.jpg"
+
+
+def _save_resized_image(src: Path, dest: Path, max_width: int = 960) -> bool:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(".tmp.jpg")
+
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(src),
+                "-vf",
+                f"scale='min({max_width},iw)':-2",
+                "-q:v",
+                "4",
+                str(tmp),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except Exception:
+        return False
+
+    if not tmp.exists():
+        return False
+
+    try:
+        tmp.replace(dest)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return dest.exists()
+
+
+def _image_target_path(performer: Performer) -> Path:
+    slug = _slug_first_last(performer.name)
+    if not slug:
+        slug = f"performer_{performer.id}"
+    return IMAGE_ROOT / f"{slug}.jpg"
 
 
 def _save_resized_image(src: Path, dest: Path, max_width: int = 960) -> bool:
@@ -318,11 +349,7 @@ async def set_performer_image(
         target = _image_target_path(p)
         # Clear previous variants for this performer
         for cand in _candidate_image_paths(p.name):
-            try:
-                cand.unlink(missing_ok=True)
-            except OSError:
-                # Ignore read-only filesystems; a new upload will be saved to a writable root
-                pass
+            cand.unlink(missing_ok=True)
 
         if not _save_resized_image(src, target):
             raise HTTPException(500, "Failed to process image")
