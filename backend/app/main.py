@@ -6,10 +6,12 @@ import zipfile
 import hashlib
 import mimetypes
 import shutil
+import tempfile
+import urllib.request
 
 import re
 from pathlib import Path
-from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Query
+from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Query, Form
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -43,6 +45,7 @@ def startup():
     THUMB_CACHE.mkdir(parents=True, exist_ok=True)
     ZIP_CACHE.mkdir(parents=True, exist_ok=True)
     PERFORMER_THUMB_DIR.mkdir(parents=True, exist_ok=True)
+    IMAGE_ROOT.mkdir(parents=True, exist_ok=True)
     # Ensure a default media selection exists
     with next(get_db()) as db:
         sel = db.get(AppSetting, "media_selected_path")
@@ -90,6 +93,47 @@ def _candidate_image_paths(name: str):
         return []
     exts = [".jpg", ".jpeg", ".png", ".webp"]
     return [(IMAGE_ROOT / f"{slug}{ext}") for ext in exts]
+
+
+def _image_target_path(performer: Performer) -> Path:
+    slug = _slug_first_last(performer.name)
+    if not slug:
+        slug = f"performer_{performer.id}"
+    return IMAGE_ROOT / f"{slug}.jpg"
+
+
+def _save_resized_image(src: Path, dest: Path, max_width: int = 960) -> bool:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(".tmp.jpg")
+
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(src),
+                "-vf",
+                f"scale='min({max_width},iw)':-2",
+                "-q:v",
+                "4",
+                str(tmp),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except Exception:
+        return False
+
+    if not tmp.exists():
+        return False
+
+    try:
+        tmp.replace(dest)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return dest.exists()
 
 def _to_int(v):
     v = (v or "").strip()
@@ -213,6 +257,58 @@ def get_performer(performer_id: int, db: Session = Depends(get_db)):
     d = p.__dict__.copy()
     d.pop("_sa_instance_state", None)
     return d
+
+
+@app.post("/performers/{performer_id}/image")
+async def set_performer_image(
+    performer_id: int,
+    file: UploadFile | None = File(None),
+    url: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    p = db.get(Performer, performer_id)
+    if not p:
+        raise HTTPException(404, "Performer not found")
+
+    if not file and not url:
+        raise HTTPException(400, "Provide a file upload or a URL")
+
+    with tempfile.TemporaryDirectory(prefix="performer_img_") as tmpdir:
+        src = Path(tmpdir) / "source"
+
+        if url:
+            cleaned = url.strip()
+            if not re.match(r"^https?://", cleaned, re.IGNORECASE):
+                raise HTTPException(400, "Only http/https URLs are supported")
+            try:
+                urllib.request.urlretrieve(cleaned, src)
+            except Exception as e:
+                raise HTTPException(400, f"Failed to download image: {e}")
+
+        if file:
+            try:
+                content = await file.read()
+                if not content:
+                    raise HTTPException(400, "Uploaded file is empty")
+                src.write_bytes(content)
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(400, f"Failed to read uploaded file: {e}")
+
+        if not src.exists():
+            raise HTTPException(400, "No image content provided")
+
+        target = _image_target_path(p)
+        # Clear previous variants for this performer
+        for cand in _candidate_image_paths(p.name):
+            cand.unlink(missing_ok=True)
+
+        if not _save_resized_image(src, target):
+            raise HTTPException(500, "Failed to process image")
+
+    _clear_performer_thumbs(performer_id)
+    return {"status": "ok", "image": str(target)}
 
 
 @app.delete("/performers/{performer_id}")
