@@ -232,7 +232,7 @@ def health(db: Session = Depends(get_db)):
     return {"app": APP_NAME, "version": APP_VERSION, "media_root": str(MEDIA_ROOT), "image_root": str(IMAGE_ROOT), "media_indexed": len(media_count)}
 @app.get("/performers")
 def list_performers(db: Session = Depends(get_db)):
-    # Aggregate media counts per performer (scenes = videos/images, galleries = zip).
+    # Aggregate media counts per performer (videos/images separated; galleries = zip).
     counts = {}
     for performer_id, kind, cnt in db.execute(
         select(
@@ -243,21 +243,32 @@ def list_performers(db: Session = Depends(get_db)):
         .join(MediaItem, PerformerMedia.media_item_id == MediaItem.id)
         .group_by(PerformerMedia.performer_id, MediaItem.kind)
     ).all():
-        entry = counts.setdefault(int(performer_id), {"scene_count": 0, "gallery_count": 0})
+        entry = counts.setdefault(
+            int(performer_id),
+            {"scene_count": 0, "gallery_count": 0, "video_count": 0, "image_count": 0},
+        )
         k = (kind or "").lower()
         if k == "zip":
             entry["gallery_count"] += int(cnt)
-        else:
-            entry["scene_count"] += int(cnt)
+        elif k == "video":
+            entry["video_count"] += int(cnt)
+        elif k == "image":
+            entry["image_count"] += int(cnt)
+        entry["scene_count"] = entry["video_count"] + entry["image_count"]
 
     rows = db.execute(select(Performer).order_by(Performer.name.asc())).scalars().all()
     out = []
     for p in rows:
         d = p.__dict__.copy()
         d.pop("_sa_instance_state", None)
-        c = counts.get(int(p.id), {"scene_count": 0, "gallery_count": 0})
+        c = counts.get(
+            int(p.id),
+            {"scene_count": 0, "gallery_count": 0, "video_count": 0, "image_count": 0},
+        )
         d["scene_count"] = c["scene_count"]
         d["gallery_count"] = c["gallery_count"]
+        d["video_count"] = c["video_count"]
+        d["image_count"] = c["image_count"]
         out.append(d)
     return out
 
@@ -309,6 +320,8 @@ def create_performer(payload: PerformerPayload, db: Session = Depends(get_db)):
     d.pop("_sa_instance_state", None)
     d["scene_count"] = 0
     d["gallery_count"] = 0
+    d["video_count"] = 0
+    d["image_count"] = 0
     return d
 
 
@@ -319,6 +332,24 @@ def get_performer(performer_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Performer not found")
     d = p.__dict__.copy()
     d.pop("_sa_instance_state", None)
+
+    counts = {"scene_count": 0, "gallery_count": 0, "video_count": 0, "image_count": 0}
+    for kind, cnt in db.execute(
+        select(MediaItem.kind, func.count(MediaItem.id))
+        .join(PerformerMedia, PerformerMedia.media_item_id == MediaItem.id)
+        .where(PerformerMedia.performer_id == performer_id)
+        .group_by(MediaItem.kind)
+    ):
+        k = (kind or "").lower()
+        if k == "zip":
+            counts["gallery_count"] += int(cnt)
+        elif k == "video":
+            counts["video_count"] += int(cnt)
+        elif k == "image":
+            counts["image_count"] += int(cnt)
+    counts["scene_count"] = counts["video_count"] + counts["image_count"]
+
+    d.update(counts)
     return d
 
 
@@ -904,11 +935,13 @@ def zip_thumb(rel_path: str = Query(...), entry: str = Query(...), size: int = 3
     return FileResponse(str(out), media_type="image/jpeg", headers={"Cache-Control": "public, max-age=300"})
 
 @app.get("/media/items")
-def media_items(limit: int = 100, offset: int = 0, kind: str | None = None, db: Session = Depends(get_db)):
+def media_items(limit: int = -1, offset: int = 0, kind: str | None = None, db: Session = Depends(get_db)):
     q = select(MediaItem).order_by(MediaItem.rel_path.asc())
     if kind:
         q = q.where(MediaItem.kind == kind)
-    rows = db.execute(q.offset(offset).limit(limit)).scalars().all()
+    if limit and limit > 0:
+        q = q.offset(offset).limit(limit)
+    rows = db.execute(q).scalars().all()
     out = []
     for r in rows:
         d = r.__dict__.copy()

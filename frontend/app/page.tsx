@@ -22,6 +22,7 @@ export default function Page() {
   const [apiStatus, setApiStatus] = useState<string>("checking...");
   const [q, setQ] = useState<string>("");
   const [fieldFilter, setFieldFilter] = useState<{ key: string; value: string } | null>(null);
+  const [mediaKindFilter, setMediaKindFilter] = useState<"video" | "image" | "zip" | null>(null);
   const [pageSize, setPageSize] = useState<number>(25);
   const [page, setPage] = useState<number>(1);
   const [newName, setNewName] = useState<string>("");
@@ -63,7 +64,7 @@ export default function Page() {
 
         // Media items (for galleries list)
         try {
-          const mres = await fetch(`/api/media/items`, { cache: "no-store" });
+          const mres = await fetch(`/api/media/items?limit=-1`, { cache: "no-store" });
           const mj = await mres.json();
           const all = Array.isArray(mj) ? mj : mj?.items || [];
           setMediaItems(all);
@@ -84,6 +85,10 @@ export default function Page() {
       const fval = sp.get("fval");
       if (fkey && fval) setFieldFilter({ key: fkey, value: fval });
       else setFieldFilter(null);
+
+      const kind = sp.get("kind");
+      if (kind === "video" || kind === "image" || kind === "zip") setMediaKindFilter(kind);
+      else setMediaKindFilter(null);
     } catch {
       // ignore
     }
@@ -141,17 +146,20 @@ const filtered = useMemo(() => {
         const s = pv === null || pv === undefined ? "" : String(pv);
         if (s.trim() !== fieldFilter.value) return false;
       }
+      if (mediaKindFilter === "video" && !((p as any)?.video_count > 0)) return false;
+      if (mediaKindFilter === "image" && !((p as any)?.image_count > 0)) return false;
+      if (mediaKindFilter === "zip" && !((p as any)?.gallery_count > 0)) return false;
       if (!qq) return true;
       const name = String(p?.name || "").toLowerCase();
       const aliases = String(p?.aliases || "").toLowerCase();
       return name.includes(qq) || aliases.includes(qq);
     });
-  }, [performers, q, fieldFilter]);
+  }, [performers, q, fieldFilter, mediaKindFilter]);
 
   // Reset to page 1 whenever filters or pageSize change
   useEffect(() => {
     setPage(1);
-  }, [q, fieldFilter, pageSize]);
+  }, [q, fieldFilter, mediaKindFilter, pageSize]);
 
   const total = filtered.length;
   const effectivePageSize = pageSize === -1 ? total || 1 : pageSize;
@@ -205,6 +213,15 @@ const filtered = useMemo(() => {
       token.aborted = true;
     };
   }, [filtered]);
+
+  const setKindFilter = (kind: "video" | "image" | "zip" | null) => {
+    setMediaKindFilter(kind);
+    const sp = new URLSearchParams(window.location.search);
+    if (kind) sp.set("kind", kind);
+    else sp.delete("kind");
+    const qs = sp.toString();
+    window.history.replaceState({}, "", qs ? `/?${qs}` : "/");
+  };
 
   return (
     <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto", background: "linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%)", minHeight: "100vh" }}>
@@ -489,6 +506,36 @@ const filtered = useMemo(() => {
                 Filter: {fieldFilter.key} = {fieldFilter.value} ✕
               </button>
             )}
+
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {[
+                { label: "Videos", kind: "video" as const },
+                { label: "Images", kind: "image" as const },
+                { label: "ZIPs", kind: "zip" as const },
+              ].map((opt) => {
+                const active = mediaKindFilter === opt.kind;
+                return (
+                  <button
+                    key={opt.kind}
+                    onClick={() => setKindFilter(active ? null : opt.kind)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 12,
+                      border: active ? "1px solid #667eea" : "1px solid rgba(0,0,0,0.15)",
+                      background: active ? "rgba(102, 126, 234, 0.1)" : "rgba(0,0,0,0.02)",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      color: active ? "#4c51bf" : "inherit",
+                      fontWeight: active ? 700 : 500,
+                    }}
+                    title={`Filter performers with ${opt.label.toLowerCase()}`}
+                  >
+                    {opt.label}
+                    {active ? " ✕" : ""}
+                  </button>
+                );
+              })}
+            </div>
 
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <div style={{ fontSize: 12, opacity: 0.7 }}>Per page</div>

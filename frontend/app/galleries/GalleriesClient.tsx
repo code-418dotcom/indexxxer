@@ -72,7 +72,7 @@ export default function GalleriesClient() {
     (async () => {
       setErr("");
       try {
-        const res = await fetch(`/api/media/items`, { cache: "no-store" });
+        const res = await fetch(`/api/media/items?limit=-1`, { cache: "no-store" });
         const j = await res.json();
         const all = Array.isArray(j) ? j : j?.items || [];
         setItems(all);
